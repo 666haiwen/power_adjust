@@ -1,12 +1,12 @@
 import random
 import math
 import time
-import pickle
 import os
 import numpy as np
 from collections import namedtuple
 from itertools import count
 from env import Env
+from replayMemory import ReplayMemory, Transition
 from const import CFG
 from model import DQN
 
@@ -19,43 +19,6 @@ import torchvision.transforms as T
 env = Env('template/36nodes/')
 n_actions = env.action_space
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-Transition = namedtuple('Transition', ('state', 'action', 'next_state', 'reward'))
-
-class ReplayMemory(object):
-    def __init__(self, capacity):
-        self.capacity = capacity
-        self.memory = []
-        self.postion = 0
-        self.cnt = 0
-    
-    def push(self, *args):
-        """ Save a transition."""
-        if len(self.memory) < self.capacity:
-            print('current memory capacity: {}'.format(len(self.memory)))
-            self.memory.append(None)
-        self.memory[self.postion] = Transition(*args)
-        self.postion = (self.postion + 1) % self.capacity
-        if self.postion == self.capacity - 1:
-            self.__save()
-    
-    def sample(self, batch_size):
-        return random.sample(self.memory, batch_size)
-    
-    def read(self):
-        """ Read the data from disk by pickel"""
-        if not os.path.exists('memory/data.pkl'):
-            return
-        with open('memory/data.pkl', 'rb') as fp:
-            self.memory = pickle.load(fp)
-            self.postion = self.capacity - 1
-
-    def __len__(self):
-        return len(self.memory)
-    
-    def __save(self):
-        with open('memory/data.pkl', 'wb') as fp:
-            pickle.dump(self.memory, fp)
-
 
 steps_done = 0
 def select_action(state):
@@ -63,7 +26,8 @@ def select_action(state):
     sample = random.random()
     eps_threshold = CFG.EPS_END + (CFG.EPS_START - CFG.EPS_END) * \
         math.exp(-1. * steps_done / CFG.EPS_DECAY)
-    steps_done += 1
+    if len(memory) > CFG.BATCH_SIZE:
+        steps_done += 1
     if sample > eps_threshold:
         with torch.no_grad():
             # t.max(1) will return largest column value of each row.
@@ -77,7 +41,9 @@ def select_action(state):
 def optimize_model():
     if len(memory) < CFG.BATCH_SIZE:
         return torch.tensor([0], dtype=torch.float)
-    transitions = memory.sample(CFG.BATCH_SIZE)
+    minSample = min(len(successMemory), int(CFG.BATCH_SIZE / 2))
+    sucessSample = random.randrange(minSample) if minSample > 0 else 0
+    transitions = memory.sample(CFG.BATCH_SIZE - sucessSample) + successMemory.sample(sucessSample)
     # Transpose the batch (see https://stackoverflow.com/a/19343/3343043 for
     # detailed explanation). This converts batch-array of Transitions
     # to Transition of batch-arrays.
@@ -120,14 +86,18 @@ def optimize_model():
     return loss
 
 
+random.seed(CFG.SEED)
+torch.manual_seed(CFG.SEED)
 policy_net = DQN(CFG.DATA.NODES_NUM, CFG.DATA.FEATURES_NUM, n_actions).to(device)
 target_net = DQN(CFG.DATA.NODES_NUM, CFG.DATA.FEATURES_NUM, n_actions).to(device)
 target_net.load_state_dict(policy_net.state_dict())
 target_net.eval()
 
 optimizer = optim.RMSprop(policy_net.parameters())
-memory = ReplayMemory(10000)
+memory = ReplayMemory(10000, 'memory/data.pkl')
 memory.read()
+successMemory = ReplayMemory(1000, 'memory/success.pkl', True)
+successMemory.read()
 
 epoch_end = 0
 if CFG.LOAD_MODEL == True and os.path.exists(CFG.MODEL_PATH):
@@ -135,7 +105,7 @@ if CFG.LOAD_MODEL == True and os.path.exists(CFG.MODEL_PATH):
     policy_net.load_state_dict(checkpoint['model_state_dict'])
     target_net.load_state_dict(checkpoint['model_state_dict'])
     epoch_end = checkpoint['epoch']
-    optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+    # optimizer.load_state_dict(checkpoint['op#timizer_state_dict'])
 
 
 for epoch in range(epoch_end + 1, CFG.EPOCHS):
@@ -146,6 +116,7 @@ for epoch in range(epoch_end + 1, CFG.EPOCHS):
     cnt = 0
     while True:
         action = select_action(state)
+        print('actions:', env.get_action(action))
         reward, done = env.step(action.item())
         reward = torch.tensor([reward], device=device, dtype=torch.float)
 
@@ -166,6 +137,8 @@ for epoch in range(epoch_end + 1, CFG.EPOCHS):
         # finish or not
         if done:
             print('One epoch done, reward = {}'.format(reward.item()))
+            if reward == 1:
+                successMemory.push(state, action, next_state, reward)
             break
     # Update the target network, copying all weights and biases in DQN
     if epoch % CFG.TARGET_UPDATE == 0:
@@ -179,4 +152,5 @@ for epoch in range(epoch_end + 1, CFG.EPOCHS):
         torch.save({
             'epoch': epoch,
             'model_state_dict': policy_net.state_dict(),
+            'optimizer_state_dict': optimizer.state_dict()
         }, CFG.MODEL_PATH)

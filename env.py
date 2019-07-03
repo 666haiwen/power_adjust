@@ -19,7 +19,8 @@ class Env(object):
     def __init__(self, path='template/', runPath='run/'):
         self.path = path
         self.runPath = runPath
-        self.action_space = 4
+        # self.action_space = 18 * 2 * 2 # 18 nodes, pg/qg , +/-
+        self.action_space = 8 * 2 * 2
 
     def reset(self):
         """
@@ -48,9 +49,9 @@ class Env(object):
         3: qg +0.1
         """
         return {
-            'index': 8,
-            'feature': int(action / 2),
+            'index': int(action / 4),
+            'feature': int((action % 4) / 2),
             'value': -0.1 if action % 2 == 0 else 0.1,
-            'node': 'loads'
+            'node': 'loads' if action >= 8 * 4 else 'generators'
         }
         

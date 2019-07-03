@@ -1,6 +1,8 @@
 import os
-import numpy as np
+import subprocess
+import tempfile
 import time
+import numpy as np
 from const import FEATURENS_NUM, FEATURENS, THERESHOLD
 
 class TrendData(object):
@@ -17,6 +19,7 @@ class TrendData(object):
         self.nodesNum = len(self.g_index) + len(self.l_index)
         self.g_len = len(self.g_index)
         self.l_len = len(self.l_index)
+        self.tmp_out = tempfile.SpooledTemporaryFile(10*1000)
     
     def get_state(self):
         """
@@ -38,7 +41,23 @@ class TrendData(object):
             state[0][0][i + self.g_len][4] = self.__get_loads(i)['Type']
         return state
 
-    def reward(self, action):
+    def set_state(self, state):
+        """
+            Set data from state outside.
+        """
+        for i in range(self.g_len):
+            self.generators[self.g_index[i]]['Pg'] = state[i][0]
+            self.generators[self.g_index[i]]['Qg'] = state[i][1]
+            self.generators[self.g_index[i]]['V0'] = state[i][2]
+            self.generators[self.g_index[i]]['Type'] = state[i][4]
+
+        for i in range(self.l_len):
+            self.loads[self.l_index[i]]['Pg'] = state[i + self.g_len][0]
+            self.loads[self.l_index[i]]['Qg'] = state[i + self.g_len][1]
+            self.loads[self.l_index[i]]['V0'] = state[i + self.g_len][2]
+            self.loads[self.l_index[i]]['Type'] = state[i + self.g_len][4]
+
+    def reward(self, action=None):
         """
             1.Change the trendData by action
             2.Run WMLFRTMsg.exe
@@ -47,14 +66,16 @@ class TrendData(object):
             reward: 1: Convergence 0: DisConvergence -1: OutOf range.
             done: True or False
         """
-        flag = self.__changeData(action)
+        flag = self.__changeData(action) if action != None else True
         if flag:
             self.__output()
             cwd = os.getcwd()
             os.chdir(self.runPath)
-            output = os.popen('WMLFRTMsg.exe')
+            fileno = self.tmp_out.fileno()
+            p =subprocess.Popen('WMLFRTMsg.exe', stdout=fileno,stderr=fileno)
+            p.wait()
+            self.tmp_out.seek(0)
             os.chdir(cwd)
-            time.sleep(0.25)
             with open(os.path.join(self.runPath,  'LF.CAL'), 'r', encoding='gbk') as fp:
                 firstLine = fp.readline()
                 data = firstLine.split(',')
