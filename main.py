@@ -14,11 +14,12 @@ import torch
 import torch.optim as optim
 import torch.nn.functional as F
 import torchvision.transforms as T
-
+from tensorboardX import SummaryWriter
 
 env = Env('template/36nodes/')
 n_actions = env.action_space
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+writer = SummaryWriter('log')
 
 steps_done = 0
 def select_action(state):
@@ -105,15 +106,20 @@ if CFG.LOAD_MODEL == True and os.path.exists(CFG.MODEL_PATH):
     policy_net.load_state_dict(checkpoint['model_state_dict'])
     target_net.load_state_dict(checkpoint['model_state_dict'])
     epoch_end = checkpoint['epoch']
+    rewards = checkpoint['rewards']
     # optimizer.load_state_dict(checkpoint['op#timizer_state_dict'])
 
 
+first_time = time.time()
+rewards = []
+losses = []
 for epoch in range(epoch_end + 1, CFG.EPOCHS):
     before_time = time.time()
     env.reset()
     state = torch.from_numpy(env.get_state()).to(device)
     train_loss = 0
     cnt = 0
+    reward = 0
     while True:
         action = select_action(state)
         print('actions:', env.get_action(action))
@@ -133,6 +139,7 @@ for epoch in range(epoch_end + 1, CFG.EPOCHS):
         if loss != 0:
             train_loss += loss
             cnt += 1
+            convergence = 0
         
         # finish or not
         if done:
@@ -143,14 +150,20 @@ for epoch in range(epoch_end + 1, CFG.EPOCHS):
     # Update the target network, copying all weights and biases in DQN
     if epoch % CFG.TARGET_UPDATE == 0:
         target_net.load_state_dict(policy_net.state_dict())
-    time_cost = time.time() - before_time    
-    if cnt == 0:
-        cnt = 1
-    print('====> Epoch: {} \tAverage loss : {:.4f}\tTime cost: {:.0f}'.format(
-        epoch, train_loss / cnt, time_cost))
-    if epoch % CFG.SAVE_EPOCHS == 0:
+
+    cnt = 1 if cnt == 0 else cnt
+    time_now = time.time()
+    rewards.append(reward)
+    losses.append(train_loss / cnt)
+    writer.add_scalar('Train/Loss', train_loss / cnt, epoch)
+    writer.add_scalar('Train/Reward', reward, epoch)
+    print('====> Epoch: {} \tAverage loss : {:.4f}\tTime cost: {:.0f}\tAll time: {:.0f}'.format(
+        epoch, losses[-1], time_now - before_time, time_now - first_time))
+    if (epoch + 1) % CFG.SAVE_EPOCHS == 0:
         torch.save({
             'epoch': epoch,
             'model_state_dict': policy_net.state_dict(),
-            'optimizer_state_dict': optimizer.state_dict()
+            'optimizer_state_dict': optimizer.state_dict(),
+            'rewards': rewards,
+            'losses': losses
         }, CFG.MODEL_PATH)

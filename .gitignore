@@ -4,3 +4,5 @@ template/*
 run/*
 *.pth
 *pkl
+data
+log
