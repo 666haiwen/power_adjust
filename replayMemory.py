@@ -6,6 +6,13 @@ from collections import namedtuple
 
 Transition = namedtuple('Transition', ('state', 'action', 'next_state', 'reward'))
 class ReplayMemory(object):
+    """
+        Save Transition into Memory to train.
+        @param:
+        capacity: the capacity of memory
+        path: the path to save in order to read next time
+        save: bool, true: means save whenever a new case added; false: only save when capacity is full (Again).
+    """
     def __init__(self, capacity, path, save=False):
         self.capacity = capacity
         self.memory = []

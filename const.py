@@ -1,7 +1,8 @@
 from easydict import EasyDict as edict
 
 NODES_NUM = 18
-FEATURENS= ['Pg', 'Qg', 'V0', 'Node', 'Type']
+# FEATURENS= ['Pg', 'Qg', 'V0', 'Node', 'Type']
+FEATURENS= ['Pg', 'Qg']
 FEATURENS_NUM = len(FEATURENS)
 THERESHOLD = {
     'Pg': [0, 10],

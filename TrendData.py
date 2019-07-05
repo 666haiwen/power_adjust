@@ -27,18 +27,18 @@ class TrendData(object):
             @return:
             state: darray, shape:[nodesNum, featuresNum]
         """
-        state = np.zeros((1, 1, self.nodesNum, FEATURENS_NUM), dtype=np.float32)
+        state = np.zeros((1, FEATURENS_NUM, self.nodesNum), dtype=np.float32)
         for i in range(self.g_len):
-            state[0][0][i][0] = self.__get_generators(i)['Pg']
-            state[0][0][i][1] = self.__get_generators(i)['Qg']
-            state[0][0][i][2] = self.__get_generators(i)['V0']
-            state[0][0][i][4] = self.__get_generators(i)['Type']
+            state[0][0][i] = self.__get_generators(i)['Pg']
+            state[0][1][i] = self.__get_generators(i)['Qg']
+            # state[0][2][i] = self.__get_generators(i)['V0']
+            # state[0][4][i] = self.__get_generators(i)['Type']
         for i in range(self.l_len):
-            state[0][0][i + self.g_len][0] = self.__get_loads(i)['Pg']
-            state[0][0][i + self.g_len][1] = self.__get_loads(i)['Qg']
-            state[0][0][i + self.g_len][2] = self.__get_loads(i)['V0']
-            state[0][0][i + self.g_len][3] = 1
-            state[0][0][i + self.g_len][4] = self.__get_loads(i)['Type']
+            state[0][0][i + self.g_len] = self.__get_loads(i)['Pg']
+            state[0][1][i + self.g_len] = self.__get_loads(i)['Qg']
+            # state[0][2][i + self.g_len] = self.__get_loads(i)['V0']
+            # state[0][3][i + self.g_len] = 1
+            # state[0][4][i + self.g_len] = self.__get_loads(i)['Type']
         return state
 
     def set_state(self, state):
@@ -46,16 +46,16 @@ class TrendData(object):
             Set data from state outside.
         """
         for i in range(self.g_len):
-            self.generators[self.g_index[i]]['Pg'] = state[i][0]
-            self.generators[self.g_index[i]]['Qg'] = state[i][1]
-            self.generators[self.g_index[i]]['V0'] = state[i][2]
-            self.generators[self.g_index[i]]['Type'] = state[i][4]
+            self.generators[self.g_index[i]]['Pg'] = state[0][i]
+            self.generators[self.g_index[i]]['Qg'] = state[1][i]
+            # self.generators[self.g_index[i]]['V0'] = state[2][i]
+            # self.generators[self.g_index[i]]['Type'] = state[4][i]
 
         for i in range(self.l_len):
-            self.loads[self.l_index[i]]['Pg'] = state[i + self.g_len][0]
-            self.loads[self.l_index[i]]['Qg'] = state[i + self.g_len][1]
-            self.loads[self.l_index[i]]['V0'] = state[i + self.g_len][2]
-            self.loads[self.l_index[i]]['Type'] = state[i + self.g_len][4]
+            self.loads[self.l_index[i]]['Pg'] = state[i + self.g_len]
+            self.loads[self.l_index[i]]['Qg'] = state[1][i + self.g_len]
+            # self.loads[self.l_index[i]]['V0'] = state[2][i + self.g_len]
+            # self.loads[self.l_index[i]]['Type'] = state[4][i + self.g_len]
 
     def reward(self, action=None):
         """
@@ -80,7 +80,7 @@ class TrendData(object):
                 firstLine = fp.readline()
                 data = firstLine.split(',')
                 if int(data[0]) != 1:
-                    return 0, False
+                    return -0.01, False
                 return 1, True
         return -1, True
 
@@ -215,3 +215,5 @@ class TrendData(object):
                 data[4] = '{:.3f}'.format(v['Pg'])
                 data[5] = '{:.3f}'.format(v['Qg'])
                 fpWrite(fp, data)
+
+

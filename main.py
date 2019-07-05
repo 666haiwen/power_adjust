@@ -19,7 +19,7 @@ from tensorboardX import SummaryWriter
 env = Env('template/36nodes/')
 n_actions = env.action_space
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-writer = SummaryWriter('log')
+writer = SummaryWriter('log/1')
 
 steps_done = 0
 def select_action(state):
@@ -41,10 +41,10 @@ def select_action(state):
 
 def optimize_model():
     if len(memory) < CFG.BATCH_SIZE:
+        print('len:', len(memory))
         return torch.tensor([0], dtype=torch.float)
     minSample = min(len(successMemory), int(CFG.BATCH_SIZE / 2))
-    sucessSample = random.randrange(minSample) if minSample > 0 else 0
-    transitions = memory.sample(CFG.BATCH_SIZE - sucessSample) + successMemory.sample(sucessSample)
+    transitions = memory.sample(CFG.BATCH_SIZE - minSample) + successMemory.sample(minSample)
     # Transpose the batch (see https://stackoverflow.com/a/19343/3343043 for
     # detailed explanation). This converts batch-array of Transitions
     # to Transition of batch-arrays.
@@ -128,11 +128,6 @@ for epoch in range(epoch_end + 1, CFG.EPOCHS):
 
         # Observe a new state
         next_state = torch.from_numpy(env.get_state()).to(device)
-        
-        # Store the transition into memeory
-        memory.push(state, action, next_state, reward)
-        # Move to the next state
-        state = next_state
 
         # Perform one step of the optimization (on the target network)
         loss = optimize_model().item()
@@ -140,13 +135,20 @@ for epoch in range(epoch_end + 1, CFG.EPOCHS):
             train_loss += loss
             cnt += 1
             convergence = 0
-        
+
+        # Store the transition into memeory
+        if reward == 1:
+            successMemory.push(state, action, next_state, reward)
+        else:
+            memory.push(state, action, next_state, reward)
+        # Move to the next state
+        state = next_state
+
         # finish or not
         if done:
             print('One epoch done, reward = {}'.format(reward.item()))
-            if reward == 1:
-                successMemory.push(state, action, next_state, reward)
             break
+
     # Update the target network, copying all weights and biases in DQN
     if epoch % CFG.TARGET_UPDATE == 0:
         target_net.load_state_dict(policy_net.state_dict())
