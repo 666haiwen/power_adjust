@@ -25,7 +25,7 @@ class TrendData(object):
         """
             Translate data into state type. shape:[nodesNum, featuresNum]
             @return:
-            state: darray, shape:[nodesNum, featuresNum]
+            state: darray, shape:[1, nodesNum, featuresNum]
         """
         state = np.zeros((1, FEATURENS_NUM, self.nodesNum), dtype=np.float32)
         for i in range(self.g_len):
@@ -46,16 +46,16 @@ class TrendData(object):
             Set data from state outside.
         """
         for i in range(self.g_len):
-            self.generators[self.g_index[i]]['Pg'] = state[0][i]
-            self.generators[self.g_index[i]]['Qg'] = state[1][i]
-            # self.generators[self.g_index[i]]['V0'] = state[2][i]
-            # self.generators[self.g_index[i]]['Type'] = state[4][i]
+            self.generators[self.g_index[i]]['Pg'] = state[0][0][i]
+            self.generators[self.g_index[i]]['Qg'] = state[0][1][i]
+            # self.generators[self.g_index[i]]['V0'] = state[0][[2][i]
+            # self.generators[self.g_index[i]]['Type'] = state[0][[4][i]
 
         for i in range(self.l_len):
-            self.loads[self.l_index[i]]['Pg'] = state[i + self.g_len]
-            self.loads[self.l_index[i]]['Qg'] = state[1][i + self.g_len]
-            # self.loads[self.l_index[i]]['V0'] = state[2][i + self.g_len]
-            # self.loads[self.l_index[i]]['Type'] = state[4][i + self.g_len]
+            self.loads[self.l_index[i]]['Pg'] = state[0][0][i + self.g_len]
+            self.loads[self.l_index[i]]['Qg'] = state[0][1][i + self.g_len]
+            # self.loads[self.l_index[i]]['V0'] = state[0][[2][i + self.g_len]
+            # self.loads[self.l_index[i]]['Type'] = state[0][[4][i + self.g_len]
 
     def reward(self, action=None):
         """

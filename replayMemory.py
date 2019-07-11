@@ -40,6 +40,18 @@ class ReplayMemory(object):
         with open(self.path, 'rb') as fp:
             self.memory = pickle.load(fp)
             self.postion = (self.capacity - 1) if len(self.memory) == self.capacity else len(self.memory)
+    
+    def set_state_and_save(self, stateList):
+        """
+        Set state from outside and save into disk.
+        """
+        for state in stateList:
+            self.memory.append(Transition(state, None, None, None))
+        self.postion = len(stateList)
+        self.__save()
+
+    def get_state(self):
+        return [m.state for m in self.memory]
 
     def __len__(self):
         return len(self.memory)

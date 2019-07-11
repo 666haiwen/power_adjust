@@ -7,3 +7,5 @@ run/*
 data
 log
 document
+stateData
+memory

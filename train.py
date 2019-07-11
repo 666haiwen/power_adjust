@@ -2,9 +2,6 @@ import random
 import math
 import time
 import os
-import numpy as np
-from collections import namedtuple
-from itertools import count
 from env import Env
 from replayMemory import ReplayMemory, Transition
 from const import CFG
@@ -13,15 +10,9 @@ from model import DQN
 import torch
 import torch.optim as optim
 import torch.nn.functional as F
-import torchvision.transforms as T
 from tensorboardX import SummaryWriter
 
-env = Env('template/36nodes/')
-n_actions = env.action_space
-device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-writer = SummaryWriter('log/1')
 
-steps_done = 0
 def select_action(state):
     global steps_done
     sample = random.random()
@@ -87,14 +78,97 @@ def optimize_model():
     return loss
 
 
+def train():
+    first_time = time.time()
+    rewards = []
+    losses = []
+    for epoch in range(epoch_end + 1, CFG.EPOCHS):
+        before_time = time.time()
+        # reset the env
+        index = env.random_reset()
+        print('random init [{}]:'.format(index))
+        state = torch.from_numpy(env.get_state()).to(device)
+
+        train_loss = cnt = reward = 0
+        while True:
+            action = select_action(state)
+            print('actions:', env.get_action(action.item()))
+            reward, done = env.step(action.item())
+            reward = torch.tensor([reward], device=device, dtype=torch.float)
+
+            # Observe a new state
+            next_state = torch.from_numpy(env.get_state()).to(device)
+
+            # Perform one step of the optimization (on the target network)
+            loss = optimize_model().item()
+            if loss != 0:
+                train_loss += loss
+                cnt += 1
+
+            # Store the transition into memeory
+            if reward == 1:
+                successMemory.push(state, action, next_state, reward)
+            else:
+                memory.push(state, action, next_state, reward)
+            # Move to the next state
+            state = next_state
+
+            # finish or not
+            if done:
+                print('One epoch done, reward = {}'.format(reward.item()))
+                break
+
+        # Update the target network, copying all weights and biases in DQN
+        if epoch % CFG.TARGET_UPDATE == 0:
+            target_net.load_state_dict(policy_net.state_dict())
+
+        cnt = 1 if cnt == 0 else cnt
+        time_now = time.time()
+        rewards.append(reward)
+        losses.append(train_loss / cnt)
+        writer.add_scalar('Loss', train_loss / cnt, epoch)
+        writer.add_scalar('Reward', reward, epoch)
+        writer.add_scalar('Index', index, epoch)
+        print('====> Epoch: {} \tAverage loss : {:.4f}\tTime cost: {:.0f}\tAll time: {:.0f}'.format(
+            epoch, losses[-1], time_now - before_time, time_now - first_time))
+        if (epoch + 1) % CFG.SAVE_EPOCHS == 0:
+            torch.save({
+                'epoch': epoch,
+                'model_state_dict': policy_net.state_dict(),
+                'optimizer_state_dict': optimizer.state_dict(),
+                'rewards': rewards,
+                'losses': losses
+            }, CFG.MODEL_PATH)
+
+
+
+# env init
+env = Env(CFG.ENV)
+env.load_data(CFG.TRAIN_DATA)
+n_actions = env.action_space
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+writer = SummaryWriter(CFG.LOG)
+
+# for epoch in range(100):
+#     writer.add_scalar('test', random.random() * 10, epoch)
+# writer.close()
+
+steps_done = 0
+
+# seed
 random.seed(CFG.SEED)
 torch.manual_seed(CFG.SEED)
+
+# model
 policy_net = DQN(CFG.DATA.NODES_NUM, CFG.DATA.FEATURES_NUM, n_actions).to(device)
 target_net = DQN(CFG.DATA.NODES_NUM, CFG.DATA.FEATURES_NUM, n_actions).to(device)
 target_net.load_state_dict(policy_net.state_dict())
 target_net.eval()
 
+# optimize
 optimizer = optim.RMSprop(policy_net.parameters())
+
+# data memory
 memory = ReplayMemory(10000, 'memory/data.pkl')
 memory.read()
 successMemory = ReplayMemory(1000, 'memory/success.pkl', True)
@@ -107,65 +181,7 @@ if CFG.LOAD_MODEL == True and os.path.exists(CFG.MODEL_PATH):
     target_net.load_state_dict(checkpoint['model_state_dict'])
     epoch_end = checkpoint['epoch']
     rewards = checkpoint['rewards']
-    # optimizer.load_state_dict(checkpoint['op#timizer_state_dict'])
 
-
-first_time = time.time()
-rewards = []
-losses = []
-for epoch in range(epoch_end + 1, CFG.EPOCHS):
-    before_time = time.time()
-    env.reset()
-    state = torch.from_numpy(env.get_state()).to(device)
-    train_loss = 0
-    cnt = 0
-    reward = 0
-    while True:
-        action = select_action(state)
-        print('actions:', env.get_action(action))
-        reward, done = env.step(action.item())
-        reward = torch.tensor([reward], device=device, dtype=torch.float)
-
-        # Observe a new state
-        next_state = torch.from_numpy(env.get_state()).to(device)
-
-        # Perform one step of the optimization (on the target network)
-        loss = optimize_model().item()
-        if loss != 0:
-            train_loss += loss
-            cnt += 1
-            convergence = 0
-
-        # Store the transition into memeory
-        if reward == 1:
-            successMemory.push(state, action, next_state, reward)
-        else:
-            memory.push(state, action, next_state, reward)
-        # Move to the next state
-        state = next_state
-
-        # finish or not
-        if done:
-            print('One epoch done, reward = {}'.format(reward.item()))
-            break
-
-    # Update the target network, copying all weights and biases in DQN
-    if epoch % CFG.TARGET_UPDATE == 0:
-        target_net.load_state_dict(policy_net.state_dict())
-
-    cnt = 1 if cnt == 0 else cnt
-    time_now = time.time()
-    rewards.append(reward)
-    losses.append(train_loss / cnt)
-    writer.add_scalar('Train/Loss', train_loss / cnt, epoch)
-    writer.add_scalar('Train/Reward', reward, epoch)
-    print('====> Epoch: {} \tAverage loss : {:.4f}\tTime cost: {:.0f}\tAll time: {:.0f}'.format(
-        epoch, losses[-1], time_now - before_time, time_now - first_time))
-    if (epoch + 1) % CFG.SAVE_EPOCHS == 0:
-        torch.save({
-            'epoch': epoch,
-            'model_state_dict': policy_net.state_dict(),
-            'optimizer_state_dict': optimizer.state_dict(),
-            'rewards': rewards,
-            'losses': losses
-        }, CFG.MODEL_PATH)
+# Train!
+train()
+writer.close()

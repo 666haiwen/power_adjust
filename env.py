@@ -1,4 +1,5 @@
 import random
+import numpy as np
 from TrendData import TrendData
 
 
@@ -23,13 +24,18 @@ class Env(object):
         # self.action_space = 18 * 2 * 2 # 18 nodes, pg/qg , +/-
         self.action_space = 8 * 2 * 2 * 4 # number * features * directions * values
         self.value = [-2, -1, -0.5, -0.1, 0.1, 0.5, 1, 2]
+        self.trendData = TrendData(self.path, self.runPath)
 
-    def reset(self):
+    def reset(self, state=None):
         """
             Reset the state.
         """
-        self.trendData = TrendData(self.path, self.runPath)
-        self.state = self.trendData.get_state()
+        if state == None:
+            self.trendData = TrendData(self.path, self.runPath)
+            self.state = self.trendData.get_state()
+        else:
+            self.state = state
+            self.trendData.set_state(state)
 
     def step(self, action):
         """
@@ -56,15 +62,42 @@ class Env(object):
             'node': 'loads' if action >= 8 * 16 else 'generators'
         }
 
-    # def set_random_sample(self, num):
-    #     for i in range(num):
+    def set_random_sample_and_save(self, num, path=None):
+        """
+        set random init env and save into disk.
+        @param:
+            num: the number of random init.
+            path: the path to save.
+        """
+        state = self.trendData.get_state()
+        size = state.shape
+        self.stateList = np.zeros((num , ) + size, dtype=np.float32)
+        for i in range(num):
+            for channel in range(size[1]):
+                for features in range(size[2]):
+                    state[0][channel][features] = round(random.random()*10,2)
+            self.stateList[i] = state.copy()
+        if path != None:
+            np.save(path, self.stateList)
 
-    #         pass
+    def load_data(self, path):
+        self.stateList = np.load(path).astype(np.float32)
+        self.state_num = len(self.stateList)
 
-    def __set_random_action(self):
-        return {
-            'index': random.randint(8, 17),
-            'feature': random.randint(0, 1),
-            'value': random.randint(5, 20) / 10 * (random.randint(0, 1) * 2 - 1),
-            'node': 'loads'
-        }
+    def random_reset(self, index=None):
+        """
+            Reset the env randomly.
+            @param:
+            index: the index of the state to reset, dafault: None(random set)
+        """
+        if index == None:
+            index = random.randint(0, len(self.stateList) - 1)
+        self.state = self.stateList[index]
+        self.trendData.set_state(self.state)
+        return index
+
+    def get_random_sample(self):
+        """
+            get state list
+        """
+        return self.stateList
