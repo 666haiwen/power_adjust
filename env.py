@@ -20,6 +20,13 @@ class Env(object):
         Return the State, Reward by action of agent.
     """
     def __init__(self, path='template/', runPath='run/'):
+        """
+            path: the path to load init data
+            runPath: the path to run WMLFRTMsg.exe
+            action_space: the number of actions
+            value: the value of adjust of parameters in state
+            trendData: the class save the state and original data of power
+        """
         self.path = path
         self.runPath = runPath
         # self.action_space = 18 * 2 * 2 # 18 nodes, pg/qg , +/-
