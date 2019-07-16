@@ -30,12 +30,12 @@ class TrendData(object):
         state = np.zeros((1, FEATURENS_NUM, self.nodesNum), dtype=np.float32)
         for i in range(self.g_len):
             state[0][0][i] = self.__get_generators(i)['Pg']
-            state[0][1][i] = self.__get_generators(i)['Qg']
+            # state[0][1][i] = self.__get_generators(i)['Qg']
             # state[0][2][i] = self.__get_generators(i)['V0']
             # state[0][4][i] = self.__get_generators(i)['Type']
         for i in range(self.l_len):
             state[0][0][i + self.g_len] = self.__get_loads(i)['Pg']
-            state[0][1][i + self.g_len] = self.__get_loads(i)['Qg']
+            # state[0][1][i + self.g_len] = self.__get_loads(i)['Qg']
             # state[0][2][i + self.g_len] = self.__get_loads(i)['V0']
             # state[0][3][i + self.g_len] = 1
             # state[0][4][i + self.g_len] = self.__get_loads(i)['Type']
@@ -47,13 +47,13 @@ class TrendData(object):
         """
         for i in range(self.g_len):
             self.generators[self.g_index[i]]['Pg'] = state[0][0][i]
-            self.generators[self.g_index[i]]['Qg'] = state[0][1][i]
+            # self.generators[self.g_index[i]]['Qg'] = state[0][1][i]
             # self.generators[self.g_index[i]]['V0'] = state[0][[2][i]
             # self.generators[self.g_index[i]]['Type'] = state[0][[4][i]
 
         for i in range(self.l_len):
             self.loads[self.l_index[i]]['Pg'] = state[0][0][i + self.g_len]
-            self.loads[self.l_index[i]]['Qg'] = state[0][1][i + self.g_len]
+            # self.loads[self.l_index[i]]['Qg'] = state[0][1][i + self.g_len]
             # self.loads[self.l_index[i]]['V0'] = state[0][[2][i + self.g_len]
             # self.loads[self.l_index[i]]['Type'] = state[0][[4][i + self.g_len]
 
@@ -100,7 +100,9 @@ class TrendData(object):
                return False
 
         elif action['node'] == 'generators':
-            index = self.l_index[action['index']]
+            if action['index'] >= self.g_len:
+                return False
+            index = self.g_index[action['index']]
             self.generators[index][feature] += action['value']
             if self.generators[index][feature] < THERESHOLD[feature][0] or \
                self.generators[index][feature] > THERESHOLD[feature][1]:
@@ -167,7 +169,7 @@ class TrendData(object):
         """
         loads = []
         index = []
-        with open(os.path.join(self.path,'LF.L6'), 'r', encoding='gbk') as fp:
+        with open(os.path.join(self.path,'LF.L6'), 'r', encoding='utf-8') as fp:
             for i, line in enumerate(fp):
                 data = line.split(',')[:-1]
                 if (int(data[0]) == 1):

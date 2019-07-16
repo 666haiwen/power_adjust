@@ -91,7 +91,6 @@ def train():
         else:
             env.reset()
         state = torch.from_numpy(env.get_state()).to(device)
-
         train_loss = cnt = reward = 0
         while True:
             action = select_action(state)
@@ -131,6 +130,7 @@ def train():
         losses.append(train_loss / cnt)
         writer.add_scalar('Loss', train_loss / cnt, epoch)
         writer.add_scalar('Reward', reward, epoch)
+        writer.add_scalar('Cnt', cnt, epoch)
         print('====> Epoch: {} \tAverage loss : {:.4f}\tTime cost: {:.0f}\tAll time: {:.0f}'.format(
             epoch, losses[-1], time_now - before_time, time_now - first_time))
         if (epoch + 1) % CFG.SAVE_EPOCHS == 0:
@@ -151,11 +151,6 @@ if CFG.RANDOM_INIT == True:
 n_actions = env.action_space
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 writer = SummaryWriter(CFG.LOG)
-
-# for epoch in range(100):
-#     writer.add_scalar('test', random.random() * 10, epoch)
-# writer.close()
-
 steps_done = 0
 
 # seed
@@ -163,8 +158,8 @@ random.seed(CFG.SEED)
 torch.manual_seed(CFG.SEED)
 
 # model
-policy_net = DQN(CFG.DATA.NODES_NUM, CFG.DATA.FEATURES_NUM, n_actions).to(device)
-target_net = DQN(CFG.DATA.NODES_NUM, CFG.DATA.FEATURES_NUM, n_actions).to(device)
+policy_net = DQN(n_actions, in_channels=CFG.DATA.FEATURES_NUM).to(device)
+target_net = DQN(n_actions, in_channels=CFG.DATA.FEATURES_NUM).to(device)
 target_net.load_state_dict(policy_net.state_dict())
 target_net.eval()
 

@@ -1,6 +1,6 @@
 import random
 import numpy as np
-from const import CFG
+from const import CFG, FEATURENS_NUM
 from TrendData import TrendData
 
 
@@ -23,7 +23,7 @@ class Env(object):
         self.path = path
         self.runPath = runPath
         # self.action_space = 18 * 2 * 2 # 18 nodes, pg/qg , +/-
-        self.action_space = CFG.DATA.GENERATORS * 2 * 2 * 4 # number * features * directions * values
+        self.action_space = CFG.DATA.GENERATORS * FEATURENS_NUM * 2 * 4 # number * features * directions * values
         self.value = [-2, -1, -0.5, -0.1, 0.1, 0.5, 1, 2]
         self.trendData = TrendData(self.path, self.runPath)
 
@@ -57,10 +57,10 @@ class Env(object):
         index: generators num + loads num
         """
         return {
-            'index': action >> 4,
-            'feature': action >> 3 & 0x1,
+            'index': action >> 3,
+            'feature': 0,
             'value': self.value[action % 8],
-            'node': 'loads' if action >= 8 * 16 else 'generators'
+            'node': 'generators'
         }
 
     def set_random_sample_and_save(self, num, path=None):
