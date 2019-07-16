@@ -85,8 +85,11 @@ def train():
     for epoch in range(epoch_end + 1, CFG.EPOCHS):
         before_time = time.time()
         # reset the env
-        index = env.random_reset()
-        print('random init [{}]:'.format(index))
+        if CFG.RANDOM_INIT == True:
+            index = env.random_reset()
+            print('random init [{}]:'.format(index))
+        else:
+            env.reset()
         state = torch.from_numpy(env.get_state()).to(device)
 
         train_loss = cnt = reward = 0
@@ -128,7 +131,6 @@ def train():
         losses.append(train_loss / cnt)
         writer.add_scalar('Loss', train_loss / cnt, epoch)
         writer.add_scalar('Reward', reward, epoch)
-        writer.add_scalar('Index', index, epoch)
         print('====> Epoch: {} \tAverage loss : {:.4f}\tTime cost: {:.0f}\tAll time: {:.0f}'.format(
             epoch, losses[-1], time_now - before_time, time_now - first_time))
         if (epoch + 1) % CFG.SAVE_EPOCHS == 0:
@@ -144,7 +146,8 @@ def train():
 
 # env init
 env = Env(CFG.ENV)
-env.load_data(CFG.TRAIN_DATA)
+if CFG.RANDOM_INIT == True:
+    env.load_data(CFG.TRAIN_DATA)
 n_actions = env.action_space
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 writer = SummaryWriter(CFG.LOG)
@@ -169,9 +172,9 @@ target_net.eval()
 optimizer = optim.RMSprop(policy_net.parameters())
 
 # data memory
-memory = ReplayMemory(10000, 'memory/data.pkl')
+memory = ReplayMemory(10000, CFG.MEMORY + 'data.pkl')
 memory.read()
-successMemory = ReplayMemory(1000, 'memory/success.pkl', True)
+successMemory = ReplayMemory(1000, CFG.MEMORY + 'success.pkl', True)
 successMemory.read()
 
 epoch_end = 0

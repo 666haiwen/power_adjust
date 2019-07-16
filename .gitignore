@@ -4,8 +4,7 @@ template/*
 run/*
 *.pth
 *pkl
-data
-log
+data/*
+log/*
+memory/*
 document
-stateData
-memory

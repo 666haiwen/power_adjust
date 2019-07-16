@@ -1,21 +1,27 @@
 from easydict import EasyDict as edict
 
-NODES_NUM = 18
+# generators + loads
+NODES_NUM = 54 + 91
 # FEATURENS= ['Pg', 'Qg', 'V0', 'Node', 'Type']
 FEATURENS= ['Pg', 'Qg']
 FEATURENS_NUM = len(FEATURENS)
 THERESHOLD = {
-    'Pg': [0, 10],
+    'Pg': [-1, 10],
     'Qg': [0, 10]
 }
 
 
 CFG = edict()
 """ ################
+    SETTING
+"""
+""" ################
     DATA
 """
 CFG.DATA = edict()
-CFG.DATA.NODES_NUM = 18
+CFG.DATA.GENERATORS = 54
+CFG.DATA.LOADS = 91
+CFG.DATA.NODES_NUM = NODES_NUM
 CFG.DATA.FEATURES_NUM = len(FEATURENS)
 """ #################
     PARAM
@@ -28,16 +34,18 @@ CFG.EPS_END = 0.05
 CFG.EPS_DECAY = 1000
 CFG.TARGET_UPDATE = 50
 CFG.SEED = 7
-CFG.LOG = 'log/7/'
+CFG.LOG = 'log/118-0/'
 """ ##############
     MODEL
 """
 CFG.LOAD_MODEL = True
 CFG.SAVE_EPOCHS = 100
-CFG.MODEL_PATH = 'model/random_genrators_36nodes_policy_net_model_state_1.pth'
+CFG.MODEL_PATH = 'model/118nodes/singel_init_model_state_0.pth'
 """ ##############
     ENV
 """
-CFG.ENV = 'template/36nodes/'
-CFG.TEST_DATA = 'memory/36nodes/test.npy'
-CFG.TRAIN_DATA = 'memory/36nodes/train.npy'
+CFG.MEMORY = 'memory/118nodes/'
+CFG.RANDOM_INIT = False
+CFG.ENV = 'template/118nodes/'
+CFG.TEST_DATA = 'memory/118nodes/test.npy'
+CFG.TRAIN_DATA = 'memory/118nodes/train.npy'
