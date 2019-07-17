@@ -100,8 +100,6 @@ class TrendData(object):
                return False
 
         elif action['node'] == 'generators':
-            if action['index'] >= self.g_len:
-                return False
             index = self.g_index[action['index']]
             self.generators[index][feature] += action['value']
             if self.generators[index][feature] < THERESHOLD[feature][0] or \

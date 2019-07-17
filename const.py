@@ -35,15 +35,15 @@ CFG.GAMMA = 0.999
 CFG.EPS_START = 0.9
 CFG.EPS_END = 0.05
 CFG.EPS_DECAY = 1000
-CFG.TARGET_UPDATE = 100
+CFG.TARGET_UPDATE = 20
 CFG.SEED = 7
-CFG.LOG = 'log/{}-0/'.format(DATA_SET)
+CFG.LOG = 'log/{}-1/'.format(DATA_SET)
 """ ##############
     MODEL
 """
 CFG.LOAD_MODEL = True
-CFG.SAVE_EPOCHS = 200
-CFG.MODEL_PATH = 'model/{}/singel_init_model_state_0.pth'.format(DATA_SET)
+CFG.SAVE_EPOCHS = 100
+CFG.MODEL_PATH = 'model/{}/singel_init_model_state_1.pth'.format(DATA_SET)
 """ ##############
     ENV
 """

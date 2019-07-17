@@ -30,9 +30,10 @@ class Env(object):
         self.path = path
         self.runPath = runPath
         # self.action_space = 18 * 2 * 2 # 18 nodes, pg/qg , +/-
-        self.action_space = CFG.DATA.GENERATORS * FEATURENS_NUM * 2 * 4 # number * features * directions * values
-        self.value = [-2, -1, -0.5, -0.1, 0.1, 0.5, 1, 2]
         self.trendData = TrendData(self.path, self.runPath)
+        self.generator_num = self.trendData.g_len
+        self.action_space = self.generator_num * FEATURENS_NUM * 2 * 4 # number * features * directions * values
+        self.value = [-2, -1, -0.5, -0.1, 0.1, 0.5, 1, 2]
 
     def reset(self, state=None):
         """
