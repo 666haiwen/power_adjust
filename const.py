@@ -1,5 +1,7 @@
 from easydict import EasyDict as edict
 
+MODEL = 'DQN'
+DATA_SET = '118nodes'
 # generators + loads
 NODES_NUM = 54 + 91
 # FEATURENS= ['Pg', 'Qg', 'V0', 'Node', 'Type']
@@ -15,14 +17,7 @@ CFG = edict()
 """ ################
     SETTING
 """
-""" ################
-    DATA
-"""
-CFG.DATA = edict()
-CFG.DATA.GENERATORS = 54
-CFG.DATA.LOADS = 91
-CFG.DATA.NODES_NUM = NODES_NUM
-CFG.DATA.FEATURES_NUM = len(FEATURENS)
+
 """ #################
     PARAM
 """
@@ -34,18 +29,20 @@ CFG.EPS_END = 0.05
 CFG.EPS_DECAY = 1000
 CFG.TARGET_UPDATE = 50
 CFG.SEED = 7
-CFG.LOG = 'log/118-0/'
+CFG.LOG = 'log/{}/{}'.format(MODEL, DATA_SET)
+
+
 """ ##############
     MODEL
 """
 CFG.LOAD_MODEL = True
 CFG.SAVE_EPOCHS = 100
-CFG.MODEL_PATH = 'model/118nodes/singel_init_model_state_0.pth'
+CFG.MODEL_PATH = 'model/{}/{}/singel_init_model_state_0.pth'.format(MODEL, DATA_SET)
+
+
 """ ##############
     ENV
 """
-CFG.MEMORY = 'memory/118nodes/'
+CFG.MEMORY = 'memory/{}/{}/'.format(MODEL, DATA_SET)
 CFG.RANDOM_INIT = False
-CFG.ENV = 'template/118nodes/'
-CFG.TEST_DATA = 'memory/118nodes/test.npy'
-CFG.TRAIN_DATA = 'memory/118nodes/train.npy'
+CFG.ENV = 'template/{}/'.format(DATA_SET)

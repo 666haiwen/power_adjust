@@ -27,4 +27,3 @@ class DQN(nn.Module):
         x = x.view(-1, self.linear_input_size)
         x = F.relu(self.fc1(x))
         return self.fc2(x)
-
