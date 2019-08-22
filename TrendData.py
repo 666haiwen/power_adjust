@@ -1,9 +1,10 @@
 import os
+from shutil import copyfile
 import subprocess
 import tempfile
 import time
 import numpy as np
-from const import FEATURENS_NUM, FEATURENS, THERESHOLD
+from const import FEATURENS_NUM, FEATURENS
 
 class TrendData(object):
     """
@@ -13,13 +14,43 @@ class TrendData(object):
     def __init__(self, path='template/', runPath='run/', buses=None, generators=None, loads=None):
         self.path = path
         self.runPath = runPath
+        # copy file to reset run env
+        self.copy_files()
+
+        # read data
         self.buses = self.__load_buses() if buses == None else buses
         self.generators, self.g_index = self.__load_generators() if generators == None else generators
         self.loads, self.l_index = self.__load_loads() if loads == None else loads
-        self.nodesNum = len(self.g_index) + len(self.l_index)
+        self.ACs, self.ac_marks = self.__load_AC_lines()
+        # set params
+        self.ac_len = len(self.ac_marks)
         self.g_len = len(self.g_index)
         self.l_len = len(self.l_index)
+        self.nodesNum = self.g_len + self.l_len + self.ac_len
         self.tmp_out = tempfile.SpooledTemporaryFile(10*1000)
+        self.get_state()
+    
+    def copy_files(self):
+        """
+            Replace the files in run dir by template dir
+        """
+        dirs = os.listdir(self.path)
+        for fileName in dirs:
+            copyfile(self.path + fileName, self.runPath + fileName)
+
+    def set_state_from_files(self, path):
+        """
+            Read generators and loads from disk,and translate them into state.
+            @param:
+            path: the path to the file read
+            @return:
+            state: the file in state type; shape=(1, 2, self.nodesNum); generators + loads + aclines(mark)
+        """
+        self.path = path
+        self.generators, self.g_index = self.__load_generators()
+        self.loads, self.l_index = self.__load_loads()
+        self.ACs, self.ac_marks = self.__load_AC_lines()
+        return self.get_state()
     
     def get_state(self):
         """
@@ -27,19 +58,26 @@ class TrendData(object):
             @return:
             state: darray, shape:[1, nodesNum, featuresNum]
         """
-        state = np.zeros((1, FEATURENS_NUM, self.nodesNum), dtype=np.float32)
+        # save the original value to define threshold
+        self.state = np.zeros((1, FEATURENS_NUM, self.nodesNum), dtype=np.float32)
         for i in range(self.g_len):
-            state[0][0][i] = self.__get_generators(i)['Pg']
-            state[0][1][i] = self.__get_generators(i)['Qg']
+            self.state[0][0][i] = self.__get_generators(i)['Pg']
+            self.state[0][1][i] = self.__get_generators(i)['Qg']
             # state[0][2][i] = self.__get_generators(i)['V0']
             # state[0][4][i] = self.__get_generators(i)['Type']
         for i in range(self.l_len):
-            state[0][0][i + self.g_len] = self.__get_loads(i)['Pg']
-            state[0][1][i + self.g_len] = self.__get_loads(i)['Qg']
+            self.state[0][0][i + self.g_len] = self.__get_loads(i)['Pg']
+            self.state[0][1][i + self.g_len] = self.__get_loads(i)['Qg']
             # state[0][2][i + self.g_len] = self.__get_loads(i)['V0']
             # state[0][3][i + self.g_len] = 1
             # state[0][4][i + self.g_len] = self.__get_loads(i)['Type']
-        return state
+        
+        # set marks of ac_lines
+        for i in range(self.ac_len):
+            self.state[0][0][i + self.g_len + self.l_len] = self.ac_marks[i]
+            self.state[0][1][i + self.g_len + self.l_len] = self.ac_marks[i]
+
+        return self.state
 
     def set_state(self, state):
         """
@@ -56,6 +94,10 @@ class TrendData(object):
             self.loads[self.l_index[i]]['Qg'] = state[0][1][i + self.g_len]
             # self.loads[self.l_index[i]]['V0'] = state[0][[2][i + self.g_len]
             # self.loads[self.l_index[i]]['Type'] = state[0][[4][i + self.g_len]
+        
+        # set marks of ac_lines
+        for i in range(self.ac_len):
+            self.ACs[i]['mark'] = self.state[0][0][i + self.g_len + self.l_len]
 
     def reward(self, action=None):
         """
@@ -94,16 +136,16 @@ class TrendData(object):
         if action['node'] == 'loads':
             index = self.l_index[action['index'] - self.g_len]
             self.loads[index][feature] += action['value']
-            if self.loads[index][feature] < THERESHOLD[feature][0] or \
-               self.loads[index][feature] > THERESHOLD[feature][1]:
+            if self.loads[index][feature] < -1 or \
+               self.loads[index][feature] > self.state[0][1][action['index']] * 3:
                self.loads[index][feature] -= action['value']
                return False
 
         elif action['node'] == 'generators':
             index = self.l_index[action['index']]
             self.generators[index][feature] += action['value']
-            if self.generators[index][feature] < THERESHOLD[feature][0] or \
-               self.generators[index][feature] > THERESHOLD[feature][1]:
+            if self.generators[index][feature] < -1 or \
+               self.generators[index][feature] > self.state[0][0][action['index']] * 3:
                self.generators[index][feature] -= action['value']
                return False
         
@@ -120,7 +162,7 @@ class TrendData(object):
             load buses data into memory.
         """
         buses = [None]
-        with open(os.path.join(self.path,'LF.L1'), 'r', encoding='gbk') as fp:
+        with open(os.path.join(self.path, 'LF.L1'), 'r', encoding='gbk') as fp:
             for line in fp:
                 data = line.split(',')[:-1]
                 buses.append({
@@ -135,7 +177,7 @@ class TrendData(object):
         """
         generators = []
         index = []
-        with open(os.path.join(self.path,'LF.L5'), 'r', encoding='gbk') as fp:
+        with open(os.path.join(self.path, 'LF.L5'), 'r', encoding='gbk') as fp:
             for i, line in enumerate(fp):
                 data = line.split(',')[:-1]
                 if (int(data[0]) == 1):
@@ -161,6 +203,23 @@ class TrendData(object):
                 })
         return generators, index
     
+    def __load_AC_lines(self):
+        ACs = []
+        ac_marks = []
+        with open(os.path.join(self.path, 'LF.L2'), 'r', encoding='gbk') as fp:
+            for line in fp:
+                data = line.split(',')[:-1]
+                ac_marks.append(int(data[0]))
+                R = float(data[4])
+                X = float(data[5])
+                ACs.append({
+                    'mark': int(data[0]),
+                    'R': R,
+                    'X': X,
+                    'data': data.copy()
+                })
+        return ACs, ac_marks
+
     def __load_loads(self):
         """
             load loads data into memory.
@@ -201,6 +260,12 @@ class TrendData(object):
             for s in data:
                 fp.write(s + ',')
             fp.write('\n')
+
+        with open(os.path.join(self.runPath, 'LF.L2'), 'w+', encoding='utf-8') as fp:
+            for v in self.ACs:
+                data = v['data']
+                data[0] = '{}'.format(v['mark'])
+                fpWrite(fp, data)
 
         with open(os.path.join(self.runPath, 'LF.L5'), 'w+', encoding='utf-8') as fp:
             for v in self.generators:

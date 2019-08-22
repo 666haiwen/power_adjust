@@ -21,6 +21,11 @@ class ReplayMemory(object):
         self.path = path
         self.save = save
     
+    def reset(self):
+        self.memory = []
+        self.postion = 0
+        self.cnt = 0
+
     def push(self, *args):
         """ Save a transition."""
         if len(self.memory) < self.capacity:

@@ -19,24 +19,33 @@ class Env(object):
         Env of power calculation.
         Return the State, Reward by action of agent.
     """
-    def __init__(self, path='template/', runPath='run/'):
+    def __init__(self, path='template/', runPath='run/', rand=False):
         self.path = path
         self.runPath = runPath
+        self.rand = rand
         # self.action_space = 18 * 2 * 2 # 18 nodes, pg/qg , +/-
-        self.action_space = CFG.DATA.GENERATORS * 2 * 2 * 4 # number * features * directions * values
-        self.value = [-2, -1, -0.5, -0.1, 0.1, 0.5, 1, 2]
         self.trendData = TrendData(self.path, self.runPath)
+        self.action_space = self.trendData.g_len * 2 * 2 * 4 # number * features * directions * values
+        self.state_dim = self.trendData.nodesNum
+        self.value = [-2, -1, -0.5, -0.1, 0.1, 0.5, 1, 2]
 
-    def reset(self, state=None):
+    def reset(self):
         """
             Reset the state.
         """
-        if state == None:
-            self.trendData = TrendData(self.path, self.runPath)
-            self.state = self.trendData.get_state()
-        else:
-            self.state = state
-            self.trendData.set_state(state)
+        self.state = self.trendData.set_state_from_files(self.path).copy()
+
+    def random_reset(self, index=None):
+        """
+            Reset the env randomly.
+            @param:
+            index: the index of the state to reset, dafault: None(random set)
+        """
+        if index == None:
+            index = random.randint(0, self.state_num - 1)
+        self.state = self.stateList[index]
+        self.trendData.set_state(self.state)
+        return index
 
     def step(self, action):
         """
@@ -62,40 +71,15 @@ class Env(object):
             'value': self.value[action % 8],
             'node': 'loads' if action >= 8 * 16 else 'generators'
         }
-
-    def set_random_sample_and_save(self, num, path=None):
-        """
-        set random init env and save into disk.
-        @param:
-            num: the number of random init.
-            path: the path to save.
-        """
-        state = self.trendData.get_state()
-        size = state.shape
-        self.stateList = np.zeros((num , ) + size, dtype=np.float32)
-        for i in range(num):
-            for channel in range(size[1]):
-                for features in range(size[2]):
-                    state[0][channel][features] = round(random.random()*10,2)
-            self.stateList[i] = state.copy()
-        if path != None:
-            np.save(path, self.stateList)
-
+    
     def load_data(self, path):
+        """
+            Load data into stateList.
+            @param:
+            path: the path to the data file
+        """
         self.stateList = np.load(path).astype(np.float32)
         self.state_num = len(self.stateList)
-
-    def random_reset(self, index=None):
-        """
-            Reset the env randomly.
-            @param:
-            index: the index of the state to reset, dafault: None(random set)
-        """
-        if index == None:
-            index = random.randint(0, len(self.stateList) - 1)
-        self.state = self.stateList[index]
-        self.trendData.set_state(self.state)
-        return index
 
     def get_random_sample(self):
         """
