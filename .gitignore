@@ -2,9 +2,10 @@
 __pycache__
 template/*
 run/*
-*.pth
-*pkl
+model/*
 data/*
 log/*
 memory/*
 document
+*.pth*
+*pkl
