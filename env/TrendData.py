@@ -4,8 +4,8 @@ import subprocess
 import tempfile
 import time
 import numpy as np
-from const import FEATURENS_NUM, RATE, SECTION_TASK, VOLTAGE_TASK
-from const import proximity_section, proximity_voltage
+from .const import proximity_section, proximity_voltage
+from .const import FEATURENS_NUM, RATE, SECTION_TASK, VOLTAGE_TASK
 
 class TrendData(object):
     """

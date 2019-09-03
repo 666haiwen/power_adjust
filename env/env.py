@@ -2,7 +2,7 @@ import os
 import random
 import numpy as np
 import json
-from TrendData import TrendData
+from .TrendData import TrendData
 
 
 class Env(object):
