@@ -1,11 +1,11 @@
 .vscode
 __pycache__
-template/*
-run/*
 model/*
-data/*
+env/*/*
+#env/*.py
 log/*
 memory/*
-document
+convergence/*
 *.pth*
-*pkl
+*.pkl
+
