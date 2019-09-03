@@ -3,9 +3,11 @@ __pycache__
 convergence
 template
 run
-*.pth
-*pkl
 data
+model/*
+env/*/*
 log/*
 memory/*
-document
+*.pth*
+*.pkl
+
