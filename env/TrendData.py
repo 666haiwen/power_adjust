@@ -4,8 +4,8 @@ import subprocess
 import tempfile
 import time
 import numpy as np
-from .const import proximity_section, proximity_voltage
-from .const import FEATURENS_NUM, RATE, SECTION_TASK, VOLTAGE_TASK
+from env.const import proximity_section, proximity_voltage
+from env.const import FEATURENS_NUM, RATE, SECTION_TASK, VOLTAGE_TASK
 
 class TrendData(object):
     """
@@ -33,7 +33,6 @@ class TrendData(object):
         # copy file to reset run env
         self.tmp_out = tempfile.SpooledTemporaryFile(10*1000)
         self.copy_files()
-        self.run()
 
         # read data
         self.buses, self.bus_name = self.__load_buses() if buses == None else buses
@@ -50,6 +49,7 @@ class TrendData(object):
         self.state_dim = (FEATURENS_NUM, self.nodesNum)
         # initialize the state
         self.state = np.zeros((1, FEATURENS_NUM, self.nodesNum), dtype=np.float32)
+        self.Pg = 0
     
     def reset(self, path):
         """
@@ -61,12 +61,14 @@ class TrendData(object):
         self.generators, self.g_index = self.__load_generators()
         self.loads, self.l_index = self.__load_loads()
         self.ACs = self.__load_AC_lines()
+        self.get_state()
         if self.target != 'convergence':
             self.run()
             self.ACs_output = self.__load_AC_output_lines()
             self.pre_value = self.__calculate_state_section_reward()
+            self.Pg = sum(self.state[0,0,:self.g_len])
+            self.pre_Pg = self.Pg
 
-        self.get_state()
 
     def copy_files(self):
         """
@@ -144,6 +146,9 @@ class TrendData(object):
         p.wait()
         self.tmp_out.seek(0)
         os.chdir(cwd)
+        # data = self.__run_result()
+        # return sum(data[:, 0]), sum(data[:, 1])
+
 
     def reward(self, action=None, reback_action=None):
         """
@@ -160,7 +165,11 @@ class TrendData(object):
             self.run()
             
             convergence = True
-            with open(os.path.join(self.runPath,  'LF.CAL'), 'r', encoding='gbk') as fp:
+            Cal_path = os.path.join(self.runPath,  'LF.CAL')
+            while not os.path.exists(Cal_path):
+                time.sleep(0.2)
+
+            with open(Cal_path, 'r', encoding='gbk') as fp:
                 firstLine = fp.readline()
                 data = firstLine.split(',')
                 if int(data[0]) != 1:
@@ -174,8 +183,8 @@ class TrendData(object):
             else:
                 # state from convergence to disconvergence
                 if convergence == False:
-                    self.__changeData(reback_action)
-                    return -1, True
+                    self.state = np.zeros((1, FEATURENS_NUM, self.nodesNum), dtype=np.float32)
+                    return (-10, -10), True
                 
                 # still convergence
                 if self.target == 'state-section':
@@ -183,7 +192,7 @@ class TrendData(object):
                 elif self.target == 'state-voltage':
                     return self.__state_voltage_reward()
 
-        return -1, True
+        return -10, True
 
     def __calculate_state_section_reward(self):
         value = 0
@@ -200,17 +209,29 @@ class TrendData(object):
             reward: value
             done: True or False
         """
+        # section reward
         self.ACs_output = self.__load_AC_output_lines()
         value = self.__calculate_state_section_reward()
         pre_value = self.pre_value
         self.pre_value = value
+        section_reward = proximity_section(value)
+        section_reward_reback = proximity_section(pre_value)
+
+        # Pg reward
+        Pg = sum(self.state[0,0,:self.g_len])
+        Pg_reward = abs(Pg - self.Pg) * SECTION_TASK['Pg_rate']
+        reverse_Pg_reward = abs(self.pre_Pg - self.Pg) * SECTION_TASK['Pg_rate']
+        self.pre_Pg = Pg
+
+        done = False
         # finish the target of state section adjust
         if value >= RATE[0] * SECTION_TASK['value'] and\
             value <= RATE[1] * SECTION_TASK['value']:
-            return 1, True
+            done = True
+            return (10, 10), True
         
         # not finish the target
-        return proximity_section(value) - proximity_section(pre_value), False
+        return (section_reward + Pg_reward, section_reward_reback + reverse_Pg_reward), done
 
     def __state_voltage_reward(self):
         """
@@ -245,6 +266,8 @@ class TrendData(object):
             self.generators[index]['Qg'] += action['value'] * rate
             self.state[0][0][action['index']] += action['value']
             self.state[0][1][action['index']] += action['value'] * rate
+            if self.generators[index]['Pg'] <= -1:
+                return False
         
         return True
         
@@ -253,6 +276,30 @@ class TrendData(object):
     
     def __get_loads(self, index):
         return self.loads[self.l_index[index]]
+
+    def __run_result(self):
+        """
+            After run WMLFRTMsg.exe.Read Pg and Qg of balance_machine. \n
+            @returns: \n
+            data: array; [[Pg, Qg], [Pg, Qg]].. shape(n,2); means different value of PV machine.
+        """
+        flag = False
+        data = []
+        for v in self.tmp_out:
+            line = v.decode().strip().split('  ')
+            if 'Slack' in line[0]:
+                flag = True
+                continue
+            if flag:
+                if not 'BUS' in line[0]:
+                    continue
+                PV_data = []
+                for v in line[1:]:
+                    if v != '':
+                        print(v)
+                        PV_data.append(float(v))
+                data.append(PV_data)
+        return np.array(data)
 
     def __load_buses(self):
         """

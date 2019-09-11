@@ -10,4 +10,4 @@ log/*
 memory/*
 *.pth*
 *.pkl
-
+*.rar

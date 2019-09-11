@@ -2,6 +2,7 @@ FEATURENS_NUM = 2
 RATE = [0.97, 1.03]
 SECTION_TASK = {
     'value': 5,
+    'Pg_rate': -0.2,
     'sections': [
         ['BUS22', 'BUS20'], # 9-25
         ['BUS22', 'BUS21'], # 9-24
@@ -20,9 +21,9 @@ def proximity_section(x):
         target value of state-section problem.
     """
     y = SECTION_TASK['value']
-    rate = 1 / (y * 0.2)
+    rate = 0.5
     diff = abs(y - x)
-    return 1 - rate * diff
+    return - rate * diff
 
 
 def proximity_voltage(x):
@@ -31,6 +32,6 @@ def proximity_voltage(x):
         target value of state-voltage problem.
     """
     y = VOLTAGE_TASK['value']
-    rate = 1 / (y * 0.02)
+    rate = 1 / (y * 0.2)
     diff = abs(y - x)
     return 1 - rate * diff

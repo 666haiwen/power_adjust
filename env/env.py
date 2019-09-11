@@ -2,7 +2,7 @@ import os
 import random
 import numpy as np
 import json
-from .TrendData import TrendData
+from env.TrendData import TrendData
 
 
 class Env(object):
@@ -65,22 +65,43 @@ class Env(object):
             self.cnt = (self.cnt + 1) % self.capacity
         else:
             self.trendData.reset(self.dataset['train'][self.fix_data_index])
+        return self.cnt
 
     def step(self, action):
         """
-            Get an action from agent.
-            Return the state, reward and next state after this action
+            Get an action from agent. \n
+            Return the state, reward and next state after this action\n
+            @returns:\n
+            next_state, reward, done
         """
         stateChange, reback_stateChange = self.get_action(action)
         reward, done = self.trendData.reward(stateChange, reback_stateChange)
         return self.trendData.state, reward, done
 
+    def score(self):
+        """
+            Return current value for state-section or state-voltage
+        """
+        if self.target != 'convergence':
+            return self.trendData.pre_value
+        else:
+            return None
+
     def get_state(self):
         return self.trendData.state
 
+    def get_reverse(self, action):
+        """
+            R
+        """
+        if self.target == 'state-section':
+            return ((action >> 3) << 3) + 7 - action % 8
+        else:
+            return ((action >> 1) << 1) + (action + 1) % 2
+
     def get_action(self, action):
         """
-            Only modify the mark of ACs.
+            translate the action into the dict to modify LF.** files.
             @param:
             action: the action value;
             @return:

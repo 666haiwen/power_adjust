@@ -49,6 +49,15 @@ class dataLoader_36Nodes(object):
                 'test': test_dataset
             }, fp)
 
-        
+
+def test_Pg_Generators_Loads(path):
+
+    with open(path + 'convergence.json', 'r') as fp:
+        convergence_files = json.load(fp)
+
+    with open(path + 'disconvergence.json', 'r') as fp:
+        disconvergence_files = json.load(fp)
+    
+
 data = dataLoader_36Nodes('env/data/36nodes/')
 # memory = ReplayMemory(100000, CFG.MEMORY + 'data.pkl')
