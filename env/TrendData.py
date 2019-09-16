@@ -50,6 +50,8 @@ class TrendData(object):
         # initialize the state
         self.state = np.zeros((1, FEATURENS_NUM, self.nodesNum), dtype=np.float32)
         self.Pg = 0
+        self.valueList = []
+
     
     def reset(self, path):
         """
@@ -68,6 +70,7 @@ class TrendData(object):
             self.pre_value = self.__calculate_state_section_reward()
             self.Pg = sum(self.state[0,0,:self.g_len])
             self.pre_Pg = self.Pg
+            self.valueList = [self.pre_value]
 
 
     def copy_files(self):
@@ -231,6 +234,10 @@ class TrendData(object):
             return (10, 10), True
         
         # not finish the target
+        if value in self.valueList:
+            return (-10, section_reward_reback + reverse_Pg_reward), done
+        else:
+            self.valueList.append(value)
         return (section_reward + Pg_reward, section_reward_reback + reverse_Pg_reward), done
 
     def __state_voltage_reward(self):
