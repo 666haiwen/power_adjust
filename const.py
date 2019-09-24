@@ -37,4 +37,4 @@ CFG.MODEL_PATH = 'model/36nodes.pth'
     ENV
 """
 CFG.MEMORY = 'memory/'
-CFG.RANDOM_INIT = False
+CFG.RANDOM_INIT = True

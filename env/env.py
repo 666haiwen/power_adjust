@@ -10,7 +10,7 @@ class Env(object):
         Env of power calculation.
         Return the State, Reward by action of agent.
     """
-    def __init__(self, dataset='36nodes', runPath='env/run/', target='state-section', rand=False, train=True):
+    def __init__(self, dataset='36nodes', runPath='env/run/', target='state-section', rand=False):
         """
             @params:
             36nodes: the path to the template folder, load initialize settings.
@@ -30,13 +30,13 @@ class Env(object):
             name = 'disconvergence.json' if target == 'convergence' else 'convergence.json'
             with open(self.path + name, 'r') as fp:
                 self.dataset = json.load(fp)
+                self.dataset = self.dataset['train'] + self.dataset['test']
         self.rand = rand
-        self.train = train
-        self.capacity = len(self.dataset['train']) if train else len(self.dataset['test'])
+        self.capacity = len(self.dataset)
         self.fix_data_index = random.randint(0, self.capacity - 1)
         self.cnt = 0
 
-        self.trendData = TrendData(self.dataset['train'][self.fix_data_index], runPath, target=target)
+        self.trendData = TrendData(self.dataset[self.fix_data_index], runPath, target=target)
         self.target = target
         if target != 'state-section' and target != 'state-voltage' and target != 'convergence':
             raise ValueError("the param of target must be 'state-section' \
@@ -57,14 +57,11 @@ class Env(object):
         if index != None:
             self.cnt = index
         if self.rand:
-            if self.train:
-                self.trendData.reset(self.dataset['train'][self.cnt])
-            else:
-                self.trendData.reset(self.dataset['test'][self.cnt])
+            self.trendData.reset(self.dataset[self.cnt])
                 
             self.cnt = (self.cnt + 1) % self.capacity
         else:
-            self.trendData.reset(self.dataset['train'][self.fix_data_index])
+            self.trendData.reset(self.dataset[self.fix_data_index])
         return self.cnt
 
     def step(self, action):

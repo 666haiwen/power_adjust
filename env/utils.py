@@ -60,4 +60,3 @@ def test_Pg_Generators_Loads(path):
     
 
 data = dataLoader_36Nodes('env/data/36nodes/')
-# memory = ReplayMemory(100000, CFG.MEMORY + 'data.pkl')

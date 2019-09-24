@@ -235,7 +235,7 @@ class TrendData(object):
         
         # not finish the target
         if value in self.valueList:
-            return (-10, section_reward_reback + reverse_Pg_reward), done
+            return (-10, section_reward_reback + reverse_Pg_reward), True
         else:
             self.valueList.append(value)
         return (section_reward + Pg_reward, section_reward_reback + reverse_Pg_reward), done

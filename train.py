@@ -13,11 +13,11 @@ import torch.nn.functional as F
 from tensorboardX import SummaryWriter
 
 
-def select_action(state, steps_done, decay):
+def select_action(state, steps_done, decay, test=False):
     sample = random.random()
     eps_threshold = CFG.EPS_END + (CFG.EPS_START - CFG.EPS_END) * \
         math.exp(-1. * steps_done / decay)
-    if sample > eps_threshold:
+    if sample > eps_threshold or test:
         with torch.no_grad():
             return policy_net(state).max(1)[1].view(1, 1), False
     else:
@@ -67,6 +67,7 @@ def optimize_model():
 def train(steps_done):
     print('Begin to Train!\n')
     decay = CFG.EPS_DECAY
+    success_rate = [False for i in range(env.capacity)]
     for epoch in range(epoch_end + 1, CFG.EPOCHS):
         index = env.reset()
         print("epoch[{}/{}]  index: [{}]".format(epoch, CFG.EPOCHS, index))
@@ -75,7 +76,7 @@ def train(steps_done):
         train_loss = cnt = q_cnt = reward_cnt = 0
         while True:
             cnt += 1
-            action, rand = select_action(state, steps_done, decay)
+            action, rand = select_action(state, steps_done, decay, test=True)
             next_state, reward_tuple, done = env.step(action.item())
             if type(reward_tuple) != tuple:
                 reward_tuple = (reward_tuple, reward_tuple)
@@ -116,8 +117,9 @@ def train(steps_done):
             # Move to the next state
             state = next_state
 
-        print('Epoch = {}   reward = {}  Loss: {:.4f}  Value: [{:.3f}]'\
-            .format(epoch, reward.item(), train_loss / cnt, value))
+        success_rate[epoch % env.capacity] = True if reward > 0 else False
+        print('Epoch = {}   reward = {}  Loss: {:.4f}  Value: [{:.3f}] Success: [{}/{}]'\
+            .format(epoch, reward.item(), train_loss / cnt, value, sum(success_rate), env.capacity))
         # writer.add_scalar('value', value, epoch)
         writer.add_scalars('dqn', {
             'score': reward_cnt,
@@ -125,17 +127,21 @@ def train(steps_done):
         }, epoch)
         writer.add_scalar('Loss', train_loss / cnt, epoch)
         writer.add_scalar('Done', done and reward > 0, epoch)
+        writer.add_scalar('Success', sum(success_rate) / len(success_rate), epoch)
         # Update the target network, copying all weights and biases in DQN
         if epoch % CFG.TARGET_UPDATE == 0:
             target_net.load_state_dict(policy_net.state_dict())
 
-        if (epoch + 1) % CFG.SAVE_EPOCHS == 0:
+        if epoch % CFG.SAVE_EPOCHS == 0:
             torch.save({
                 'epoch': epoch,
                 'model_state_dict': policy_net.state_dict(),
                 'optimizer_state_dict': optimizer.state_dict(),
             }, CFG.MODEL_PATH)
             memory.save()
+        
+        
+
 
 # env init
 env = Env(rand=CFG.RANDOM_INIT)
