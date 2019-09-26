@@ -35,26 +35,15 @@ class ReplayMemory(object):
     def sample(self, batch_size):
         return random.sample(self.memory, batch_size)
     
-    def read(self, memory=None, rate=1):
+    def read(self):
         """ Read the data from disk by pickel"""
-        if (not os.path.exists(self.path)) and (memory==None):
+        if not os.path.exists(self.path):
             return
-        if memory != None:
-            self.memory = []
-            self.postion = 0
-            for v in memory:
-                if v.reward > 0:
-                    self.push(v.state, v.action, v.next_state, v.reward, v.done)
-            self.save()
-        else:
-            with open(self.path, 'rb') as fp:
-                data = pickle.load(fp)
-                self.memory = data['memory']
-                self.postion = data['position']
-                if rate < 1:
-                    length = int(len(self.memory) * rate)
-                    self.memory = self.memory[:length]
-                    self.postion = len(self.memory)
+        with open(self.path, 'rb') as fp:
+            data = pickle.load(fp)
+            self.memory = data['memory']
+            self.postion = data['position']
+            
 
     def get_state(self):
         return [m.state for m in self.memory]
@@ -175,3 +164,23 @@ class PrioritizedReplayBuffer(ReplayMemory):
             self.it_min[idx] = priority ** self.alpha
 
             self.max_priority = max(self.max_priority, priority)
+    
+    def save(self):
+        with open(self.path, 'wb') as fp:
+            pickle.dump({
+                'memory': self.memory,
+                'position': self.postion,
+                'it_sum': self.it_sum,
+                'it_min': self.it_min
+            }, fp)
+    
+    def read(self):
+        """ Read the data from disk by pickel"""
+        if not os.path.exists(self.path):
+            return
+        with open(self.path, 'rb') as fp:
+            data = pickle.load(fp)
+            self.memory = data['memory']
+            self.postion = data['position']
+            self.it_sum = data['it_sum']
+            self.it_min = data['it_min']

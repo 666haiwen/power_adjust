@@ -16,7 +16,7 @@ CFG.EPS_DECAY = 5000
 CFG.EPS_DECAY_RANDOM_BEGIN = 10000
 CFG.SEED = 7
 CFG.LR = 1e-3
-
+CFG.TAU = 0.001
 """ ################
     LOG
 """
@@ -30,7 +30,7 @@ CFG.LOAD_MODEL = False
 CFG.MEMORY_READ = False
 CFG.TARGET_UPDATE = 30
 CFG.SAVE_EPOCHS = 100
-CFG.MODEL_PATH = 'model/36nodes.pth'
+CFG.MODEL_PATH = 'model/36nodes_new_state_adjust.pth'
 
 
 """ ##############

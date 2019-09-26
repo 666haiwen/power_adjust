@@ -50,13 +50,4 @@ class dataLoader_36Nodes(object):
             }, fp)
 
 
-def test_Pg_Generators_Loads(path):
-
-    with open(path + 'convergence.json', 'r') as fp:
-        convergence_files = json.load(fp)
-
-    with open(path + 'disconvergence.json', 'r') as fp:
-        disconvergence_files = json.load(fp)
-    
-
-data = dataLoader_36Nodes('env/data/36nodes/')
+data = dataLoader_36Nodes('env/data/36nodes_new/')

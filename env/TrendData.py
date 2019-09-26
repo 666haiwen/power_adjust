@@ -77,7 +77,7 @@ class TrendData(object):
         """
             Replace the files in run dir by template dir
         """
-        dirs = ['LF.L0', 'LF.L1', 'LF.L2', 'LF.L3', 'LF.L4', 'LF.L5', 'LF.L6', 'LF.L7']
+        dirs = ['LF.L0', 'LF.L1', 'LF.L2', 'LF.L3', 'LF.L5', 'LF.L6']
         for fileName in dirs:
             copyfile(self.path + '/' + fileName, self.runPath + '/' + fileName)
 
@@ -180,7 +180,7 @@ class TrendData(object):
             
             if self.target == 'convergence':
                 if convergence == True:
-                    return 1, True
+                    return 10, True
                 else:
                     return -0.1, False
             else:

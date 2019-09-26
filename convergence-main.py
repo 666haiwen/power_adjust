@@ -77,20 +77,13 @@ def train(steps_done):
         while True:
             cnt += 1
             action, rand = select_action(state, steps_done, decay)
-            next_state, reward_tuple, done = env.step(action.item())
-            if type(reward_tuple) != tuple:
-                reward_tuple = (reward_tuple, reward_tuple)
-            reward = torch.tensor([reward_tuple[0]], device=device, dtype=torch.float)
+            next_state, reward, done = env.step(action.item())
+            reward = torch.tensor([reward], device=device, dtype=torch.float)
             reward_cnt += reward
             done = torch.tensor([done], device=device, dtype=torch.float)
             next_state = torch.from_numpy(next_state).to(device)
-            
-            # Perform one step of the optimization (on the target network)
-            if done:
-                next_state = None
-            # Store the transition into memory
-            memory.push(state, action, next_state, reward, done)
 
+            # Perform one step of the optimization (on the target network)
             if len(memory) >= CFG.BATCH_SIZE:
                 loss, q_value = optimize_model()
                 q_cnt += q_value
@@ -101,23 +94,19 @@ def train(steps_done):
                     'loss': loss
                     }, steps_done)
 
-            # Move to the next state
-            state = next_state
-            
-            value = env.score()
             if not rand:
                 # writer.add_scalar('action_reward', reward, steps_done)
-                print('actions: {};  reward: {};  value: {:.3f}'.format(env.get_action(action.item())[0], reward.item(), value))
+                print('actions: {};  reward: {}'.format(env.get_action(action.item())[0], reward.item()))
 
-            # Store the reverse transition into memory
-            # if not done:
-            #     reverse_action = torch.tensor([[env.get_reverse(action.item())]], device=device, dtype=torch.long)
-            #     reverse_reward = torch.tensor([reward_tuple[1]], device=device, dtype=torch.float)
-            #     memory.push(next_state, reverse_action, state, reverse_reward, done)
-
+            if done:
+                next_state = None
+            # Store the transition into memory
+            memory.push(state, action, next_state, reward, done)
             # finish
             if done:
                 break
+            # Move to the next state
+            state = next_state
 
         success_rate[epoch % env.capacity] = True if reward > 0 else False
         print('Epoch = {}   reward = {}  Loss: {:.4f}  Value: [{:.3f}] Success: [{}/{}]'\
@@ -132,10 +121,9 @@ def train(steps_done):
         writer.add_scalar('Success', sum(success_rate) / len(success_rate), epoch)
         # Update the target network, copying all weights and biases in DQN
         if epoch % CFG.TARGET_UPDATE == 0:
-            for param_target, param in zip(target_net.parameters(), policy_net.parameters()):
-                param_target.data.copy_(param_target.data * (1.0 - CFG.TAU) + param.data * CFG.TAU)
-            # target_net.load_state_dict(policy_net.state_dict())
-
+          for param_target, param in zip(target_net.parameters(), policy_net.parameters()):
+            param_target.data.copy_(param_target.data * (1.0 - CFG.TAU) + param.data * CFG.TAU)
+            
         if epoch % CFG.SAVE_EPOCHS == 0:
             torch.save({
                 'epoch': epoch,
@@ -148,7 +136,7 @@ def train(steps_done):
 
 
 # env init
-env = Env(rand=CFG.RANDOM_INIT, dataset='36nodes_new')
+env = Env(rand=CFG.RANDOM_INIT, dataset='36nodes_new', target='convergence')
 n_actions = env.action_space
 state_dim = env.state_dim
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -168,7 +156,7 @@ target_net.eval()
 # optimizer = optim.RMSprop(policy_net.parameters(), lr=CFG.LR)
 optimizer = optim.Adam(policy_net.parameters(), lr=CFG.LR)
 # data memory
-memory = PrioritizedReplayBuffer(100000, CFG.MEMORY + '36nodes_new_state_adjust_train_data.pkl')
+memory = PrioritizedReplayBuffer(100000, CFG.MEMORY + 'convergence_train_data.pkl')
 if CFG.MEMORY_READ:
     memory.read()
 
@@ -179,7 +167,7 @@ if CFG.LOAD_MODEL == True and os.path.exists(CFG.MODEL_PATH):
     policy_net.load_state_dict(checkpoint['model_state_dict'])
     target_net.load_state_dict(checkpoint['model_state_dict'])
     epoch_end = checkpoint['epoch']
-    steps_done = epoch_end * 20
+    # steps_done = epoch_end * 20
     # env.reset(epoch_end)
 # Train!
 writer = SummaryWriter(CFG.LOG)
