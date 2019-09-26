@@ -75,9 +75,10 @@ class PrioritizedReplayBuffer(ReplayMemory):
 
     def push(self, *args):
         position = self.postion
-        super().push(*args)
         self.it_sum[position] = self.max_priority ** self.alpha
         self.it_min[position] = self.max_priority ** self.alpha
+        super().push(*args)
+        
 
     def _sample_proportional(self, batch_size):
         res = []
