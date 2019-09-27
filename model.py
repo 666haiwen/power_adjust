@@ -60,13 +60,21 @@ class Dueling_DQN(nn.Module):
             nn.LeakyReLU(negative_slope=0.05),
             nn.Linear(512, 1024),
             nn.LeakyReLU(negative_slope=0.05),
+            nn.Linear(1024, 1024),
+            nn.LeakyReLU(negative_slope=0.05),
             nn.Linear(1024, 512),
             nn.LeakyReLU(negative_slope=0.05),
             nn.Linear(512, 256),
             nn.LeakyReLU(negative_slope=0.05),
         )
         self.state_fc = nn.Linear(256, 1)
-        self.advantage_fc = nn.Linear(256, actions_num)
+        self.advantage_fc = nn.Sequential(
+            nn.Linear(256, 512),
+            nn.LeakyReLU(negative_slope=0.05),
+            nn.Linear(512, 256),
+            nn.LeakyReLU(negative_slope=0.05),
+            nn.Linear(256, actions_num)
+        )
 
     def forward(self, x):
         x = x.view(-1, self.linear_input_size)

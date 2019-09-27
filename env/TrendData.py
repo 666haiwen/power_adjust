@@ -187,7 +187,7 @@ class TrendData(object):
                 # state from convergence to disconvergence
                 if convergence == False:
                     self.state = np.zeros((1, FEATURENS_NUM, self.nodesNum), dtype=np.float32)
-                    return (-10, -10), True
+                    return -10, True
                 
                 # still convergence
                 if self.target == 'state-section':
@@ -215,30 +215,19 @@ class TrendData(object):
         # section reward
         self.ACs_output = self.__load_AC_output_lines()
         value = self.__calculate_state_section_reward()
-        pre_value = self.pre_value
         self.pre_value = value
         section_reward = proximity_section(value)
-        section_reward_reback = proximity_section(pre_value)
 
         # Pg reward
         Pg = sum(self.state[0,0,:self.g_len])
         Pg_reward = abs(Pg - self.Pg) * SECTION_TASK['Pg_rate']
-        reverse_Pg_reward = abs(self.pre_Pg - self.Pg) * SECTION_TASK['Pg_rate']
-        self.pre_Pg = Pg
 
-        done = False
         # finish the target of state section adjust
         if value >= RATE[0] * SECTION_TASK['value'] and\
             value <= RATE[1] * SECTION_TASK['value']:
-            done = True
-            return (10, 10), True
+            return 10, True
         
-        # not finish the target
-        if value in self.valueList:
-            return (-10, section_reward_reback + reverse_Pg_reward), True
-        else:
-            self.valueList.append(value)
-        return (section_reward + Pg_reward, section_reward_reback + reverse_Pg_reward), done
+        return section_reward + Pg_reward, False
 
     def __state_voltage_reward(self):
         """
