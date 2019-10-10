@@ -72,6 +72,7 @@ def train(steps_done):
     for epoch in range(epoch_end + 1, CFG.EPOCHS):
         success_epoch = [False for i in range(env.capacity)]
         for index in range(env.capacity):
+            env.reset()
             iter_num += 1
             print("epoch[{}]  index: [{}]".format(epoch, index))
             state = torch.from_numpy(env.get_state()).to(device)
@@ -116,12 +117,16 @@ def train(steps_done):
             print('Epoch = {}   reward = {}  Loss: {:.4f}  Value: [{:.3f}]  Success: [{}/{}]'\
                 .format(epoch, reward.item(), train_loss / cnt, value, sum(success_epoch), env.capacity))
             
-            writer.add_scalars('dqn', {
-                'q_value': q_cnt / cnt
+            writer.add_scalar('Loss', train_loss / cnt, iter_num)
+            writer.add_scalar('Done', done and reward > 0, iter_num)
+            writer.add_scalars('Success', {
+                'one_epoch': sum(success_epoch) / env.capacity,
+                'history': sum(success_rate) / env.capacity
+            }, iter_num)
+            writer.add_scalars('Epoch', {
+                'success': sum(success_rate) / env.capacity,
+                'history_success': sum(success_epoch) / env.capacity,
             }, epoch)
-            writer.add_scalar('Loss', train_loss / cnt, epoch)
-            writer.add_scalar('Done', done and reward > 0, epoch)
-            writer.add_scalar('Success', sum(success_rate) / len(success_rate), epoch)
             
             # Update the target network, copying all weights and biases in DQN
             if iter_num % CFG.TARGET_UPDATE == 0:
@@ -160,7 +165,7 @@ target_net.eval()
 # optimizer = optim.RMSprop(policy_net.parameters(), lr=CFG.LR)
 optimizer = optim.Adam(policy_net.parameters(), lr=CFG.LR)
 # data memory
-memory = PrioritizedReplayBuffer(100, CFG.MEMORY + '36nodes_new_state_adjust_PrioritizedRB.pkl')
+memory = PrioritizedReplayBuffer(1000000, CFG.MEMORY + '36nodes_new_state_adjust_PrioritizedRB.pkl')
 if CFG.MEMORY_READ:
     memory.read()
 
