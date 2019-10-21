@@ -1,7 +1,8 @@
 import os
 import random
-import numpy as np
 import json
+import numpy as np
+from shutil import copyfile
 from env.TrendData import TrendData
 
 
@@ -10,7 +11,7 @@ class Env(object):
         Env of power calculation.
         Return the State, Reward by action of agent.
     """
-    def __init__(self, dataset='36nodes', runPath='env/run/', target='state-section', rand=False):
+    def __init__(self, dataset='36nodes', runPath='env/run/', target='state-section', rand=False, thread=None):
         """
             @params:
             36nodes: the path to the template folder, load initialize settings.
@@ -20,6 +21,7 @@ class Env(object):
                     'state-voltage' means voltage trend state adjust
                     'convergence' means trend convergence adjust
             train: load train of test dataset; True of False; default: True
+            thread: id of distributed trainning env Id, default: None, means not thread env
         """
         random.seed(7)
         self.path = 'env/data/{}/'.format(dataset)
@@ -35,6 +37,16 @@ class Env(object):
         self.capacity = len(self.dataset)
         self.fix_data_index = random.randint(0, self.capacity - 1)
         self.cnt = 0
+
+        if thread != None:
+            assert type(thread) == int
+            runPath = 'env/thread_run/actor_{}/'.format(thread)
+            if not os.path.exists(runPath):
+                os.mkdir(runPath)
+                sourcePath = 'env/run/'
+                files = os.listdir(sourcePath)
+                for file_name in files:
+                    copyfile(sourcePath + file_name, runPath + file_name)
 
         self.trendData = TrendData(self.dataset[self.fix_data_index], runPath, target=target)
         self.target = target
