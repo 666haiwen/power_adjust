@@ -1,15 +1,9 @@
-from pypower.api import case39, newtonpf, runpf, ppoption, printpf, case300
-
-# Dynamic model classes
-from pydyn.controller import controller
-from pydyn.sym_order6a import sym_order6a
-from pydyn.sym_order4 import sym_order4
-from pydyn.ext_grid import ext_grid
-
+from pypower.api import case39, ppoption
+from custom_runpf import runpf
 # Simulation modules
-print('!!!!!')
 ppc = case39()
-ppopt = ppoption(PF_ALG=2)
+ppc['gen'][:,1] -= 250
+ppopt = ppoption(PF_ALG=1, VERBOSE=0)
 r = runpf(ppc, ppopt)
-
+print(r)
 # printpf(r)
