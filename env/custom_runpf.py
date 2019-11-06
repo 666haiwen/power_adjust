@@ -23,6 +23,7 @@ from pypower.makeBdc import makeBdc
 from pypower.makeSbus import makeSbus
 from pypower.dcpf import dcpf
 from pypower.makeYbus import makeYbus
+from pypower.newtonpf import newtonpf
 from pypower.fdpf import fdpf
 from pypower.gausspf import gausspf
 from pypower.makeB import makeB
@@ -35,7 +36,6 @@ from pypower.idx_bus import PD, QD, VM, VA, GS, BUS_TYPE, PQ, REF
 from pypower.idx_brch import PF, PT, QF, QT
 from pypower.idx_gen import PG, QG, VG, QMAX, QMIN, GEN_BUS, GEN_STATUS
 
-from custom_newtonpf import newtonpf
 
 def runpf(casedata=None, ppopt=None, fname='', solvedcase=''):
     """Runs a power flow.
@@ -155,15 +155,21 @@ def runpf(casedata=None, ppopt=None, fname='', solvedcase=''):
                 solver = 'Gauss-Seidel'
             else:
                 solver = 'unknown'
+            print(' -- AC Power Flow (%s)\n' % solver)
 
         ## initial state
         # V0    = ones(bus.shape[0])            ## flat start
         V0  = bus[:, VM] * exp(1j * pi/180 * bus[:, VA])
         V0[gbus] = gen[on, VG] / abs(V0[gbus]) * V0[gbus]
 
+        if qlim:
+            ref0 = ref                         ## save index and angle of
+            Varef0 = bus[ref0, VA]             ##   original reference bus(es)
+            limited = []                       ## list of indices of gens @ Q lims
+            fixedQg = zeros(gen.shape[0])      ## Qg of gens at Q limits
+
         repeat = True
         while repeat:
-            repeat = False
             ## build admittance matrices
             Ybus, Yf, Yt = makeYbus(baseMVA, bus, branch)
 
@@ -173,7 +179,7 @@ def runpf(casedata=None, ppopt=None, fname='', solvedcase=''):
             ## run the power flow
             alg = ppopt["PF_ALG"]
             if alg == 1:
-                V, success, _, normF = newtonpf(Ybus, Sbus, V0, ref, pv, pq, ppopt)
+                V, success, _ = newtonpf(Ybus, Sbus, V0, ref, pv, pq, ppopt)
             elif alg == 2 or alg == 3:
                 Bp, Bpp = makeB(baseMVA, bus, branch, alg)
                 V, success, _ = fdpf(Ybus, Sbus, V0, Bp, Bpp, ref, pv, pq, ppopt)
@@ -184,4 +190,126 @@ def runpf(casedata=None, ppopt=None, fname='', solvedcase=''):
                              'Gauss-Seidel power flow algorithms currently '
                              'implemented.\n')
 
-    return success, normF
+            ## update data matrices with solution
+            bus, gen, branch = pfsoln(baseMVA, bus, gen, branch, Ybus, Yf, Yt, V, ref, pv, pq)
+
+            if qlim:             ## enforce generator Q limits
+                ## find gens with violated Q constraints
+                gen_status = gen[:, GEN_STATUS] > 0
+                qg_max_lim = gen[:, QG] > gen[:, QMAX]
+                qg_min_lim = gen[:, QG] < gen[:, QMIN]
+                
+                mx = find( gen_status & qg_max_lim )
+                mn = find( gen_status & qg_min_lim )
+                
+                if len(mx) > 0 or len(mn) > 0:  ## we have some Q limit violations
+                    # No PV generators
+                    if len(pv) == 0:
+                        if verbose:
+                            if len(mx) > 0:
+                                print('Gen %d [only one left] exceeds upper Q limit : INFEASIBLE PROBLEM\n' % mx + 1)
+                            else:
+                                print('Gen %d [only one left] exceeds lower Q limit : INFEASIBLE PROBLEM\n' % mn + 1)
+
+                        success = 0
+                        break
+
+                    ## one at a time?
+                    if qlim == 2:    ## fix largest violation, ignore the rest
+                        k = argmax(r_[gen[mx, QG] - gen[mx, QMAX],
+                                      gen[mn, QMIN] - gen[mn, QG]])
+                        if k > len(mx):
+                            mn = mn[k - len(mx)]
+                            mx = []
+                        else:
+                            mx = mx[k]
+                            mn = []
+
+                    if verbose and len(mx) > 0:
+                        for i in range(len(mx)):
+                            print('Gen ' + str(mx[i] + 1) + ' at upper Q limit, converting to PQ bus\n')
+
+                    if verbose and len(mn) > 0:
+                        for i in range(len(mn)):
+                            print('Gen ' + str(mn[i] + 1) + ' at lower Q limit, converting to PQ bus\n')
+
+                    ## save corresponding limit values
+                    fixedQg[mx] = gen[mx, QMAX]
+                    fixedQg[mn] = gen[mn, QMIN]
+                    mx = r_[mx, mn].astype(int)
+
+                    ## convert to PQ bus
+                    gen[mx, QG] = fixedQg[mx]      ## set Qg to binding 
+                    for i in range(len(mx)):            ## [one at a time, since they may be at same bus]
+                        gen[mx[i], GEN_STATUS] = 0        ## temporarily turn off gen,
+                        bi = gen[mx[i], GEN_BUS]   ## adjust load accordingly,
+                        bus[bi, [PD, QD]] = (bus[bi, [PD, QD]] - gen[mx[i], [PG, QG]])
+                    
+                    if len(ref) > 1 and any(bus[gen[mx, GEN_BUS], BUS_TYPE] == REF):
+                        raise ValueError('Sorry, PYPOWER cannot enforce Q '
+                                         'limits for slack buses in systems '
+                                         'with multiple slacks.')
+                    
+                    bus[gen[mx, GEN_BUS].astype(int), BUS_TYPE] = PQ   ## & set bus type to PQ
+
+                    ## update bus index lists of each type of bus
+                    ref_temp = ref
+                    ref, pv, pq = bustypes(bus, gen)
+                    if verbose and ref != ref_temp:
+                        print('Bus %d is new slack bus\n' % ref)
+
+                    limited = r_[limited, mx].astype(int)
+                else:
+                    repeat = 0 ## no more generator Q limits violated
+            else:
+                repeat = 0     ## don't enforce generator Q limits, once is enough
+
+        if qlim and len(limited) > 0:
+            ## restore injections from limited gens [those at Q limits]
+            gen[limited, QG] = fixedQg[limited]    ## restore Qg value,
+            for i in range(len(limited)):               ## [one at a time, since they may be at same bus]
+                bi = gen[limited[i], GEN_BUS]           ## re-adjust load,
+                bus[bi, [PD, QD]] = bus[bi, [PD, QD]] + gen[limited[i], [PG, QG]]
+                gen[limited[i], GEN_STATUS] = 1           ## and turn gen back on
+            
+            if ref != ref0:
+                ## adjust voltage angles to make original ref bus correct
+                bus[:, VA] = bus[:, VA] - bus[ref0, VA] + Varef0
+
+    ppc["et"] = time() - t0
+    ppc["success"] = success
+
+    ##-----  output results  -----
+    ## convert back to original bus numbering & print results
+    ppc["bus"], ppc["gen"], ppc["branch"] = bus, gen, branch
+    results = int2ext(ppc)
+
+    ## zero out result fields of out-of-service gens & branches
+    if len(results["order"]["gen"]["status"]["off"]) > 0:
+        results["gen"][ix_(results["order"]["gen"]["status"]["off"], [PG, QG])] = 0
+
+    if len(results["order"]["branch"]["status"]["off"]) > 0:
+        results["branch"][ix_(results["order"]["branch"]["status"]["off"], [PF, QF, PT, QT])] = 0
+
+    if fname:
+        fd = None
+        try:
+            fd = open(fname, "a")
+        except Exception as detail:
+            stderr.write("Error opening %s: %s.\n" % (fname, detail))
+        finally:
+            if fd is not None:
+                printpf(results, fd, ppopt)
+                fd.close()
+    else:
+        printpf(results, stdout, ppopt)
+
+    ## save solved case
+    if solvedcase:
+        savecase(solvedcase, results)
+
+    return results, success, ppc
+
+
+if __name__ == '__main__':
+    runpf()

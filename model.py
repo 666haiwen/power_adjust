@@ -134,3 +134,31 @@ class Critic(nn.Module):
         q =  self.fc_q(cat)
         return q
 
+
+
+class EasyLinear(nn.Module):
+    def __init__(self, dim, use_cuda):
+        self.dim = dim
+        self.use_cuda = use_cuda
+        super(EasyLinear, self).__init__()
+        self.fc_layers = nn.Sequential(
+            nn.Linear(dim, 256),
+            nn.LeakyReLU(negative_slope=0.05),
+            nn.Linear(256, 512),
+            nn.LeakyReLU(negative_slope=0.05),
+            nn.Linear(512, 1024),
+            nn.LeakyReLU(negative_slope=0.05),
+            nn.Linear(1024, 1024),
+            nn.LeakyReLU(negative_slope=0.05),
+            nn.Linear(1024, 512),
+            nn.LeakyReLU(negative_slope=0.05),
+            nn.Linear(512, 2),
+            nn.Softmax(dim=1)
+        )
+
+    def forward(self, x):
+        if self.use_cuda:
+            x = x.cuda()
+        return self.fc_layers(x)
+    
+

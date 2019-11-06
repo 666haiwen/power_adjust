@@ -2,7 +2,7 @@ import random
 import math
 import os
 import numpy as np
-from env.Env import Env
+from env.power_env import Env
 from common.replayMemory import PrioritizedReplayBuffer, Transition
 from const import CFG
 from model import DQN, Dueling_DQN
@@ -72,9 +72,9 @@ def train(steps_done):
     for epoch in range(epoch_end + 1, CFG.EPOCHS):
         success_epoch = [False for i in range(env.capacity)]
         for index in range(env.capacity):
-            env.reset()
+            tmp_index = env.reset()
             iter_num += 1
-            print("epoch[{}]  index: [{}]".format(epoch, index))
+            print("epoch[{}]  index: [{}]".format(epoch, tmp_index))
             state = torch.from_numpy(env.get_state()).to(device)
 
             train_loss = cnt = q_cnt = 0
@@ -123,10 +123,6 @@ def train(steps_done):
                 'one_epoch': sum(success_epoch) / env.capacity,
                 'history': sum(success_rate) / env.capacity
             }, iter_num)
-            writer.add_scalars('Epoch', {
-                'success': sum(success_rate) / env.capacity,
-                'history_success': sum(success_epoch) / env.capacity,
-            }, epoch)
             
             # Update the target network, copying all weights and biases in DQN
             if iter_num % CFG.TARGET_UPDATE == 0:
@@ -140,12 +136,17 @@ def train(steps_done):
                     'optimizer_state_dict': optimizer.state_dict(),
                 }, CFG.MODEL_PATH)
                 memory.save()
+
+    writer.add_scalars('Epoch', {
+        'success': sum(success_rate) / env.capacity,
+        'history_success': sum(success_epoch) / env.capacity,
+    }, epoch)
         
         
 
 
 # env init
-env = Env(rand=CFG.RANDOM_INIT, dataset='36nodes_new')
+env = Env(rand=CFG.RANDOM_INIT, dataset='36nodes_new', target='state-voltage')
 n_actions = env.action_space
 state_dim = env.state_dim
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -165,7 +166,7 @@ target_net.eval()
 # optimizer = optim.RMSprop(policy_net.parameters(), lr=CFG.LR)
 optimizer = optim.Adam(policy_net.parameters(), lr=CFG.LR)
 # data memory
-memory = PrioritizedReplayBuffer(1000000, CFG.MEMORY + '36nodes_new_state_adjust_PrioritizedRB.pkl')
+memory = PrioritizedReplayBuffer(1000000, CFG.MEMORY + '36nodes_new_state_voltage_PrioritizedRB.pkl')
 if CFG.MEMORY_READ:
     memory.read()
 

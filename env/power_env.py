@@ -11,7 +11,8 @@ class Env(object):
         Env of power calculation.
         Return the State, Reward by action of agent.
     """
-    def __init__(self, dataset='36nodes', runPath='env/run/', target='state-section', rand=False, thread=None):
+    def __init__(self, dataset='36nodes', runPath='env/run/', target='state-section', 
+                classifer_model=None, rand=False, thread=None):
         """
             @params:
             36nodes: the path to the template folder, load initialize settings.
@@ -20,10 +21,10 @@ class Env(object):
             target: the target of task, 'state-section' means section trend state adjust, 
                     'state-voltage' means voltage trend state adjust
                     'convergence' means trend convergence adjust
+            classifer_model: model of classifer instead WML.exe, default None;
             train: load train of test dataset; True of False; default: True
             thread: id of distributed trainning env Id, default: None, means not thread env
         """
-        random.seed(7)
         self.path = 'env/data/{}/'.format(dataset)
         if not os.path.exists(self.path):
             raise ValueError("There are no dataset named '{}' \
@@ -34,6 +35,7 @@ class Env(object):
                 self.dataset = json.load(fp)
                 self.dataset = self.dataset['train'] + self.dataset['test']
         self.rand = rand
+        self.classifer_model = classifer_model
         self.capacity = len(self.dataset)
         self.fix_data_index = random.randint(0, self.capacity - 1)
         self.cnt = 0
@@ -54,11 +56,12 @@ class Env(object):
             raise ValueError("the param of target must be 'state-section' \
                 or 'state-voltage' or 'convergence'\
                 but get '{}' instead".format(target))
-        self.action_space = self.trendData.g_len * 2 * 4 if target == 'state-section' else self.trendData.ac_len * 2
+        self.action_space = self.trendData.g_len * 2 * 4 if target == 'state-section' else self.trendData.ac_len
         self.state_dim = self.trendData.nodesNum
         self.acs_index_begin = self.trendData.g_len + self.trendData.l_len
         # only change for Pg of generators
         self.value = [-1, -0.5, -0.2, -0.1, 0.1, 0.2, 0.5, 1]
+        
 
     def reset(self, index=None):
         """
@@ -84,15 +87,17 @@ class Env(object):
             next_state, reward, done
         """
         stateChange, reback_stateChange = self.get_action(action)
-        reward, done = self.trendData.reward(stateChange, reback_stateChange)
+        reward, done = self.trendData.reward(stateChange, reback_stateChange, self.classifer_model)
         return self.trendData.state, reward, done
 
     def score(self):
         """
             Return current value for state-section or state-voltage
         """
-        if self.target != 'convergence':
+        if self.target == 'state-section':
             return self.trendData.pre_value
+        elif self.target == 'state-voltage':
+            return self.trendData.pre_value[0]
         else:
             return None
 
@@ -134,11 +139,9 @@ class Env(object):
             }
         else:
             return {
-                'index': action >> 1,
-                'value': action % 2,
+                'index': action,
                 'node': 'AC'
             }, {
-                'index': action >> 1,
-                'value': (action + 1) % 2,
+                'index': action,
                 'node': 'AC'
             }

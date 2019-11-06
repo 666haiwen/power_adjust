@@ -12,7 +12,11 @@ SECTION_TASK = {
 }
 VOLTAGE_TASK = {
     'value': 1,
-    'bus': 'BUS22'
+    'min': 0.97,
+    'max': 1.03,
+    'rate': 10,
+    'bus': ['BUS22'],
+    'index': [8] # line index in LF.LP1
 }
 
 def proximity_section(x):

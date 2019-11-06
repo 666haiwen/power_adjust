@@ -2,10 +2,10 @@ import random
 import math
 import os
 import numpy as np
-from env.Env import Env
+from env.power_env import Env
 from common.replayMemory import PrioritizedReplayBuffer, Transition
 from const import CFG
-from model import DQN, Dueling_DQN
+from model import Dueling_DQN, EasyLinear
 
 import torch
 import torch.optim as optim
@@ -74,7 +74,7 @@ def train(steps_done):
         state = torch.from_numpy(env.get_state()).to(device)
 
         train_loss = cnt = q_cnt = reward_cnt = 0
-        while True:
+        while True and cnt < 50:
             cnt += 1
             action, rand = select_action(state, steps_done, decay)
             next_state, reward, done = env.step(action.item())
@@ -109,9 +109,8 @@ def train(steps_done):
             state = next_state
 
         success_rate[epoch % env.capacity] = True if reward > 0 else False
-        print('Epoch = {}   reward = {}  Loss: {:.4f}  Value: [{:.3f}] Success: [{}/{}]'\
-            .format(epoch, reward.item(), train_loss / cnt, value, sum(success_rate), env.capacity))
-        # writer.add_scalar('value', value, epoch)
+        print('Epoch = {}   reward = {}  Loss: {:.4f}  Success: [{}/{}]'\
+            .format(epoch, reward.item(), train_loss / cnt, sum(success_rate), env.capacity))
         writer.add_scalars('dqn', {
             'score': reward_cnt,
             'q_value': q_cnt / cnt
@@ -135,11 +134,22 @@ def train(steps_done):
         
 
 
+# Load Classifer Model
+classifer_model = EasyLinear(134 + 19 * 2, True)
+checkpoint = torch.load('model/36nodes-classifer-model.pt')
+classifer_model.load_state_dict(checkpoint['model_state_dict'])
+
+use_cuda = torch.cuda.is_available()
+if use_cuda:
+    device = torch.device('cuda')
+    classifer_model.cuda()
+else:
+    device = torch.device('cpu')
+
 # env init
-env = Env(rand=CFG.RANDOM_INIT, dataset='36nodes_new', target='convergence')
+env = Env(rand=CFG.RANDOM_INIT, dataset='36nodes_new', target='convergence', classifer_model=classifer_model)
 n_actions = env.action_space
 state_dim = env.state_dim
-device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 steps_done = 0
 
 # seed

@@ -4,6 +4,7 @@ import subprocess
 import tempfile
 import time
 import numpy as np
+import torch
 from env.const import proximity_section, proximity_voltage
 from env.const import FEATURENS_NUM, RATE, SECTION_TASK, VOLTAGE_TASK
 
@@ -12,7 +13,7 @@ class TrendData(object):
         Load the data of TrendData from disk to memeory.
         And check that the data is reasonable or not.
     """
-    def __init__(self, path='None', runPath='run/', target='state-section', buses=None, generators=None, loads=None, ACs=None):
+    def __init__(self, path='None', runPath='env/run/', target='state-section', buses=None, generators=None, loads=None, ACs=None):
         """
             @params:
             path: the path to the template folder, load initialize settings.
@@ -50,7 +51,6 @@ class TrendData(object):
         # initialize the state
         self.state = np.zeros((1, FEATURENS_NUM, self.nodesNum), dtype=np.float32)
         self.Pg = 0
-        self.valueList = []
 
     
     def reset(self, path):
@@ -64,13 +64,13 @@ class TrendData(object):
         self.loads, self.l_index = self.__load_loads()
         self.ACs = self.__load_AC_lines()
         self.get_state()
-        if self.target != 'convergence':
+        if self.target == 'state-section':
             self.run()
             self.ACs_output = self.__load_AC_output_lines()
             self.pre_value = self.__calculate_state_section_reward()
             self.Pg = sum(self.state[0,0,:self.g_len])
-            self.pre_Pg = self.Pg
-            self.valueList = [self.pre_value]
+        if self.target == 'state-voltage':
+            self.pre_value = [0]
 
 
     def copy_files(self):
@@ -149,11 +149,34 @@ class TrendData(object):
         p.wait()
         self.tmp_out.seek(0)
         os.chdir(cwd)
+        
+        convergence = True
+        Cal_path = os.path.join(self.runPath,  'LF.CAL')
+        while not os.path.exists(Cal_path):
+            time.sleep(0.2)
+
+        with open(Cal_path, 'r', encoding='gbk') as fp:
+            firstLine = fp.readline()
+            data = firstLine.split(',')
+            if int(data[0]) != 1:
+                convergence = False
+        return convergence
         # data = self.__run_result()
         # return sum(data[:, 0]), sum(data[:, 1])
 
 
-    def reward(self, action=None, reback_action=None):
+    def test(self, data):
+        """
+            Test the result by joint-vae.
+        """
+        ac_begin = (self.g_len + self.l_len) * 2
+        for i in range(self.ac_len):
+            self.ACs[i]['mark'] = 1 if data[ac_begin + i] >= 0.5 else 0
+        self.__output()
+        return self.run()
+        
+
+    def reward(self, action=None, reback_action=None, classifer_model=None):
         """
             1.Change the trendData by action
             2.Run WMLFRTMsg.exe
@@ -165,24 +188,13 @@ class TrendData(object):
         flag = self.__changeData(action) if action != None else True
         if flag:
             self.__output()
-            self.run()
-            
-            convergence = True
-            Cal_path = os.path.join(self.runPath,  'LF.CAL')
-            while not os.path.exists(Cal_path):
-                time.sleep(0.2)
-
-            with open(Cal_path, 'r', encoding='gbk') as fp:
-                firstLine = fp.readline()
-                data = firstLine.split(',')
-                if int(data[0]) != 1:
-                    convergence = False
+            convergence = self.run()
             
             if self.target == 'convergence':
                 if convergence == True:
                     return 10, True
                 else:
-                    return -0.1, False
+                    return self.__convergence_reward(classifer_model), False
             else:
                 # state from convergence to disconvergence
                 if convergence == False:
@@ -194,8 +206,32 @@ class TrendData(object):
                     return self.__state_section_reward()
                 elif self.target == 'state-voltage':
                     return self.__state_voltage_reward()
-
         return -10, True
+
+
+    def __convergence_reward(self, classifer_model):
+        if classifer_model == None:
+            return -0.1
+        
+        data = np.zeros((1, classifer_model.dim), dtype=np.float32)
+        # set generators data into state
+        for i in range(self.g_len):
+            data[0][i * 2] = self.state[0][0][i]
+            data[0][i * 2 + 1] = self.state[0][1][i]
+
+        # set loads data into state
+        for i in range(self.g_len, self.l_len + self.g_len):
+            data[0][i * 2] = self.state[0][0][i]
+            data[0][i * 2 + 1] = self.state[0][1][i]
+        
+        ac_begin = (self.g_len + self.l_len) * 2
+        for i in range(self.ac_len):
+            data[0][ac_begin + i] = self.ACs[i]['mark']
+        
+        data = torch.from_numpy(data).float()
+        output = classifer_model(data)[0][1]
+        return - abs(1 - output)
+
 
     def __calculate_state_section_reward(self):
         value = 0
@@ -238,7 +274,25 @@ class TrendData(object):
             reward: value
             done: True or False
         """
-        pass
+        # section voltage reward
+        value = []
+        with open(os.path.join(self.runPath, 'LF.LP1'), 'r', encoding='gbk') as fp:
+            for i, line in enumerate(fp):
+                data = line.split(',')[:-1]
+                if i in VOLTAGE_TASK['index']:
+                    value.append(float(data[1]))
+                    break
+        reward = 0
+        flag = True
+        self.pre_value = value
+        for v in value:
+            if not (v >= VOLTAGE_TASK['min'] and v <= VOLTAGE_TASK['max']):
+                flag = False
+                reward -= abs(VOLTAGE_TASK['value'] - v) * VOLTAGE_TASK['rate']
+        if flag:
+            return 10, flag
+
+        return reward, flag
 
     def __changeData(self, action):
         """
@@ -247,10 +301,10 @@ class TrendData(object):
             action: the action from agent. Apply the action into files in the disk. type: dict
         """
         if action['node'] == 'AC':
-            self.ACs[action['index']]['mark'] = action['value']
+            self.ACs[action['index']]['mark'] = 1 - self.ACs[action['index']]['mark']
             ac_index = action['index'] + self.g_len + self.l_len
-            self.state[0][0][ac_index] = action['value']
-            self.state[0][1][ac_index] = action['value']            
+            self.state[0][0][ac_index] = 1 - self.state[0][0][ac_index]
+            self.state[0][1][ac_index] = 1 - self.state[0][1][ac_index]
 
         elif action['node'] == 'generator':
             index = self.g_index[action['index']]
