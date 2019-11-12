@@ -167,11 +167,24 @@ class TrendData(object):
 
     def test(self, data):
         """
-            Test the result by joint-vae.
+            Test the result by vae.
         """
+        def re_sigmoid(x):
+            return np.log(x/(1-x))
+
         ac_begin = (self.g_len + self.l_len) * 2
         for i in range(self.ac_len):
             self.ACs[i]['mark'] = 1 if data[ac_begin + i] >= 0.5 else 0
+        for i in range(self.g_len):
+            # self.generators[i]['Pg'] = re_sigmoid(data[i * 2])
+            # self.generators[i]['Qg'] = re_sigmoid(data[i * 2 + 1])
+            self.generators[i]['Pg'] = max(0, data[i * 2])
+            self.generators[i]['Qg'] = data[i * 2 + 1]
+        for i in range(self.l_len):
+            # self.loads[i]['Pg'] = re_sigmoid(data[(i + self.g_len) * 2])
+            # self.loads[i]['Qg'] = re_sigmoid(data[(i + self.g_len) * 2 + 1])
+            self.loads[i]['Pg'] = max(0, data[(i + self.g_len) * 2])
+            self.loads[i]['Qg'] = data[(i + self.g_len) * 2 + 1]
         self.__output()
         return self.run()
         
@@ -484,10 +497,17 @@ class TrendData(object):
                 data[0] = '{}'.format(v['mark'])
                 fpWrite(fp, data)
 
-        if self.target == 'state-section':
+        if self.target == 'state-section' or 'vae' in self.target:
             with open(os.path.join(self.runPath, 'LF.L5'), 'w+', encoding='utf-8') as fp:
                 for v in self.generators:
                     data = v['data']
                     data[3] = '{:.3f}'.format(v['Pg'])
                     data[4] = '{:.3f}'.format(v['Qg'])
+                    fpWrite(fp, data)
+        if 'vae' in self.target:
+            with open(os.path.join(self.runPath, 'LF.L6'), 'w+', encoding='utf-8') as fp:
+                for v in self.loads:
+                    data = v['data']
+                    data[4] = '{:.3f}'.format(v['Pg'])
+                    data[5] = '{:.3f}'.format(v['Qg'])
                     fpWrite(fp, data)

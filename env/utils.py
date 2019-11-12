@@ -45,7 +45,7 @@ class dataLoader_36Nodes(object):
         with open(os.path.join(path, 'LF.L5'), 'r', encoding='gbk') as fp:
             for i, line in enumerate(fp):
                 data = line.split(',')[:-1]
-                generators.extend([float(data[4]), float(data[5])])
+                generators.extend([float(data[3]), float(data[4])])
         
         loads = []
         with open(os.path.join(path,'LF.L6'), 'r', encoding='gbk') as fp:

@@ -15,7 +15,12 @@ def get_case39_dataloader(batch_size=512,
 
 
 class Case39Dataset(Dataset):
-    """Case39 dataset."""
+    """Case39 dataset.
+        Data shape (numbers, 2):
+            (pg, qg) of generators
+            (pg, qg) of loads
+            (mark, mark) of acs
+    """
     def __init__(self, path_to_data, test=False, transform=True):
         """
         Parameters

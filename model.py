@@ -162,3 +162,72 @@ class EasyLinear(nn.Module):
         return self.fc_layers(x)
     
 
+class VAE(nn.Module):
+    def __init__(self, dim, latent_size, condition=False, num_labels=0):
+        super(VAE, self).__init__()
+        if condition == False:
+            num_labels = 0
+        self.condition = condition
+        self.num_labels = num_labels
+        # Define encoder
+        self.features = nn.Sequential(
+          nn.Linear(dim + num_labels, 512),
+          nn.ReLU(),
+          nn.Linear(512, 1024),
+          nn.ReLU(),
+          nn.Linear(1024, 2048),
+          nn.ReLU(),
+          nn.Linear(2048, 1024),
+          nn.ReLU(),
+          nn.Linear(1024, 512),
+          nn.ReLU()
+        )
+        self.fc2mu = nn.Linear(512, latent_size)
+        self.fc2Logvar = nn.Linear(512, latent_size)
+        self.features_to_img = nn.Sequential(
+            nn.Linear(latent_size + num_labels, 512),
+            nn.ReLU(),
+            nn.Linear(512, 1024),
+            nn.ReLU(),
+            nn.Linear(1024, 2048),
+            nn.ReLU(),
+            nn.Linear(2048, 1024),
+            nn.ReLU(),
+            nn.Linear(1024, 512),
+            nn.ReLU(),
+            nn.Linear(512, dim)
+        )
+    
+    def idx2oneHot(self, idx):
+        assert torch.max(idx).item() < self.num_labels
+        if idx.dim() == 1:
+            idx = idx.unsqueeze(1)
+        
+        onehot = torch.zeros(idx.size(0), self.num_labels)
+        onehot.scatter_(1, idx.cpu().long(), 1)
+
+        return onehot.cuda()    
+
+    def encode(self, x, c):
+        if self.condition:
+            x = torch.cat((c, x), dim=-1)
+        x = self.features(x)
+        return self.fc2mu(x), self.fc2Logvar(x)
+    
+    def reparmeterize(self, mu, logvar):
+        std = torch.exp(0.5 * logvar)
+        eps = torch.randn_like(std)
+        return mu + eps * std
+    
+    def decode(self, z, c):
+        if self.condition:
+            z = torch.cat((c, z), dim=-1)
+        res = self.features_to_img(z)
+        return res
+
+    def forward(self, x, c=None):
+        if self.condition:
+            c = self.idx2oneHot(c)
+        mu, logvar = self.encode(x, c)
+        z = self.reparmeterize(mu, logvar)
+        return self.decode(z, c), mu, logvar

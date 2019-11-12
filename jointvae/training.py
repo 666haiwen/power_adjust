@@ -11,7 +11,7 @@ EPS = 1e-12
 class Trainer():
     def __init__(self, model, optimizer, lr, cont_capacity=None,
                  disc_capacity=None, print_loss_every=50, record_loss_every=5,
-                 use_cuda=False, min_lr=1e-7, lr_update_epoch=200,
+                 use_cuda=False, min_lr=1e-7, lr_update_epoch=200, lr_decay=False,
                  epoch_save=1000, saving_path=None):
         """
         Class to handle training of model.
@@ -46,6 +46,7 @@ class Trainer():
         self.lr = lr
         self.min_lr = min_lr
         self.lr_update_epoch = lr_update_epoch
+        self.lr_decay = lr_decay
         self.cont_capacity = cont_capacity
         self.disc_capacity = disc_capacity
         self.print_loss_every = print_loss_every
@@ -277,7 +278,7 @@ class Trainer():
                 .format(recon_loss.item(), kl_loss.item(), total_loss.item()))
 
         # To avoid large losses normalise by number of pixels
-        return total_loss / self.model.dim
+        return total_loss / self.model.dim * batch_size
 
     def _kl_normal_loss(self, mean, logvar):
         """
