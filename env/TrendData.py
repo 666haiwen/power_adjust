@@ -165,7 +165,7 @@ class TrendData(object):
         # return sum(data[:, 0]), sum(data[:, 1])
 
 
-    def test(self, data):
+    def test(self, data, load=False, balance=True):
         """
             Test the result by vae.
         """
@@ -175,17 +175,30 @@ class TrendData(object):
         ac_begin = (self.g_len + self.l_len) * 2
         for i in range(self.ac_len):
             self.ACs[i]['mark'] = 1 if data[ac_begin + i] >= 0.5 else 0
+        
+        if balance:
+            loads_pg = sum([x['Pg'] for x in self.loads])
+            generators_pg = sum([x['Pg'] for x in self.generators])
+            diff_pg = max(0, loads_pg * 1.1 - generators_pg) / self.g_len
+            loads_qg = sum([x['Qg'] for x in self.loads])
+            generators_qg = sum([x['Qg'] for x in self.generators])
+            diff_qg = max(0, loads_qg * 1.1 - generators_qg) / self.g_len
+        else:
+            diff_qg = diff_pg = 0
+
         for i in range(self.g_len):
             # self.generators[i]['Pg'] = re_sigmoid(data[i * 2])
             # self.generators[i]['Qg'] = re_sigmoid(data[i * 2 + 1])
-            self.generators[i]['Pg'] = max(0, data[i * 2])
-            self.generators[i]['Qg'] = data[i * 2 + 1]
-        for i in range(self.l_len):
-            # self.loads[i]['Pg'] = re_sigmoid(data[(i + self.g_len) * 2])
-            # self.loads[i]['Qg'] = re_sigmoid(data[(i + self.g_len) * 2 + 1])
-            self.loads[i]['Pg'] = max(0, data[(i + self.g_len) * 2])
-            self.loads[i]['Qg'] = data[(i + self.g_len) * 2 + 1]
-        self.__output()
+            self.generators[i]['Pg'] = max(0, data[i * 2] + diff_pg)
+            self.generators[i]['Qg'] = data[i * 2 + 1] + diff_qg
+
+        if load:
+            for i in range(self.l_len):
+                # self.loads[i]['Pg'] = re_sigmoid(data[(i + self.g_len) * 2])
+                # self.loads[i]['Qg'] = re_sigmoid(data[(i + self.g_len) * 2 + 1])
+                self.loads[i]['Pg'] = max(0, data[(i + self.g_len) * 2])
+                self.loads[i]['Qg'] = data[(i + self.g_len) * 2 + 1]
+        self.__output(load=load)
         return self.run()
         
 
@@ -482,7 +495,7 @@ class TrendData(object):
                 })
         return loads, index
     
-    def __output(self):
+    def __output(self, load=False):
         """
             write the adjust input data to the dst dirs
         """
@@ -504,7 +517,7 @@ class TrendData(object):
                     data[3] = '{:.3f}'.format(v['Pg'])
                     data[4] = '{:.3f}'.format(v['Qg'])
                     fpWrite(fp, data)
-        if 'vae' in self.target:
+        if 'vae' in self.target and load:
             with open(os.path.join(self.runPath, 'LF.L6'), 'w+', encoding='utf-8') as fp:
                 for v in self.loads:
                     data = v['data']

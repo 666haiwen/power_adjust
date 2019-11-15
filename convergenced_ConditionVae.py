@@ -12,8 +12,6 @@ import numpy as np
 import torch
 from torch import nn, optim
 from torch.nn import functional as F
-from torch.utils.data import Dataset, DataLoader
-from torchvision import datasets, transforms
 from torchvision.utils import save_image
 from common.dataloaders import get_case39_dataloader
 from model import VAE
@@ -25,8 +23,8 @@ def get_args():
     parser = argparse.ArgumentParser(description='VAE MINST Example')
     parser.add_argument('--batch-size', type=int, default=512, metavar='N',
                         help='input batch size of trainning (default = 128)')
-    parser.add_argument('--epochs', type=int, default=2000,
-                        help='number of epochs to train (default = 2000)')
+    parser.add_argument('--epochs', type=int, default=1500,
+                        help='number of epochs to train (default = 1500)')
     parser.add_argument('--seed', type=int, default=1,
                         help='random seed (default = 1)')
     parser.add_argument('--cuda', type=bool, default=True,
@@ -43,25 +41,30 @@ def get_args():
                         help='how many batches to wait before logging training status')
     parser.add_argument('--sample', type=bool, default=False,
                         help='Test to get sample img or not')
-    parser.add_argument('--latent-size', type=int, default=8,
-                        help='number of latents (default = 8)')
-    parser.add_argument("--conditional",  type=bool, default=True)
+    parser.add_argument('--latent-size', type=int, default=16,
+                        help='number of latents (default = 16)')
+    parser.add_argument('--conditional',  type=bool, default=True)
+    parser.add_argument('--beta', type=float, default=2.0, help='weight of loads mse')
     args = parser.parse_args()
-    args.path = args.path[:-4] + '_{}.pth'.format(args.latent_size)
+    args.path = args.path[:-4] + '_enhanced_loads_beta{:.1f}_{}.pth'.format(args.beta, args.latent_size)
     args.cuda = args.cuda and torch.cuda.is_available()
     return args
 
 
 def adjust_learning_rate(lr, optimizer):
     """Sets the learning rate to the initial LR decayed 0.5 by lr_update_epoch"""
-    lr = max(1e-7, lr / torch.sqrt(2))
+    lr = max(1e-7, lr / np.sqrt(2))
     for param_group in optimizer.param_groups:
         param_group['lr'] = lr
     return lr, optimizer
 
 def loss_function(recon_x, x, mu, logvar):
     # BCE = F.binary_cross_entropy(recon_x, x, reduction='sum')
-    BCE = F.mse_loss(recon_x, x, reduction='sum')
+    BCE = F.mse_loss(recon_x, x, reduction='sum') + \
+        args.beta * F.mse_loss(
+            recon_x[:, generators_num * 2: (generators_num + loads_num) * 2],
+            x[:, generators_num * 2: (generators_num + loads_num)*2],
+            reduction='sum')
     # KL_Distance : 0.5 * sum(1 + log(sigma^2) - mu^2 - sigma^2)
     KLD = 0.5 * torch.sum(1 + logvar - mu ** 2 - logvar.exp())
     return BCE - KLD
@@ -141,7 +144,7 @@ def _test_iteration(model, trendData, data, labels, path):
     for idx in range(shape[0]):
         trendData.reset(path[idx])
         if labels[idx] == 0:
-            result = trendData.test(reverse_recon_batch[idx].cpu().numpy())
+            result = trendData.test(reverse_recon_batch[idx].cpu().numpy(), load=True, balance=False)
             if result == True:
                 print('{} convergenced!'.format(idx))
             original_failed.append(result)
@@ -184,4 +187,6 @@ if __name__ == "__main__":
     test_loader = get_case39_dataloader(path_to_data='env/data/36nodes_new/test.pkl', 
             test=True, transform=False, batch_size=args.batch_size)
 
+    generators_num = 9
+    loads_num = 10
     main()
