@@ -189,15 +189,15 @@ class TrendData(object):
         for i in range(self.g_len):
             # self.generators[i]['Pg'] = re_sigmoid(data[i * 2])
             # self.generators[i]['Qg'] = re_sigmoid(data[i * 2 + 1])
-            self.generators[i]['Pg'] = max(0, data[i * 2] + diff_pg)
-            self.generators[i]['Qg'] = data[i * 2 + 1] + diff_qg
+            self.generators[i]['Pg'] = max(0, data[(i + self.l_len) * 2] + diff_pg)
+            self.generators[i]['Qg'] = data[(i + self.l_len) * 2 + 1] + diff_qg
 
         if load:
             for i in range(self.l_len):
                 # self.loads[i]['Pg'] = re_sigmoid(data[(i + self.g_len) * 2])
                 # self.loads[i]['Qg'] = re_sigmoid(data[(i + self.g_len) * 2 + 1])
-                self.loads[i]['Pg'] = max(0, data[(i + self.g_len) * 2])
-                self.loads[i]['Qg'] = data[(i + self.g_len) * 2 + 1]
+                self.loads[i]['Pg'] = max(0, data[i * 2])
+                self.loads[i]['Qg'] = data[i * 2 + 1]
         self.__output(load=load)
         return self.run()
         

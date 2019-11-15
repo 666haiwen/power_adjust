@@ -58,7 +58,7 @@ class dataLoader_36Nodes(object):
             for line in fp:
                 data = line.split(',')[:-1]
                 ACs.append(int(data[0]))
-        return np.array(generators + loads + ACs)
+        return np.array(loads + generators + ACs)
         
 
     def train_test_dataset(self, fileList, save_path=None):

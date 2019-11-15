@@ -46,8 +46,9 @@ def get_args():
     parser.add_argument('--conditional',  type=bool, default=True)
     parser.add_argument('--beta', type=float, default=2.0, help='weight of loads mse')
     args = parser.parse_args()
-    args.path = args.path[:-4] + '_enhanced_loads_beta{:.1f}_{}.pth'.format(args.beta, args.latent_size)
+    args.path = args.path[:-4] + '_two_layers_enhanced_loads_beta{:.1f}_{}.pth'.format(args.beta, args.latent_size)
     args.cuda = args.cuda and torch.cuda.is_available()
+    args.latent_size = [4, args.latent_size]
     return args
 
 
@@ -62,8 +63,8 @@ def loss_function(recon_x, x, mu, logvar):
     # BCE = F.binary_cross_entropy(recon_x, x, reduction='sum')
     BCE = F.mse_loss(recon_x, x, reduction='sum') + \
         args.beta * F.mse_loss(
-            recon_x[:, generators_num * 2: (generators_num + loads_num) * 2],
-            x[:, generators_num * 2: (generators_num + loads_num)*2],
+            recon_x[:, :loads_num * 2],
+            x[:, :loads_num * 2],
             reduction='sum')
     # KL_Distance : 0.5 * sum(1 + log(sigma^2) - mu^2 - sigma^2)
     KLD = 0.5 * torch.sum(1 + logvar - mu ** 2 - logvar.exp())
@@ -102,15 +103,16 @@ def train(model, optimizer, train_loader, epoch_begin, lr):
             print('--------Update Lr[{:.7f}]-------'.format(lr))
         # log
         time_cost = time.time() - before_time
-        torch.save({
-            'epoch': epoch,
-            'model_state_dict': model.state_dict(),
-            'optimizer_state_dict': optimizer.state_dict(),
-            'loss': loss,
-            'lr': lr
-        }, args.path)
         print('====> Epoch: {} \tAverage loss : {:.4f}\tTime cost: {:.0f}'.format(
             epoch, train_loss / len(train_loader.dataset), time_cost))
+        if epoch % args.log_interval == 0 or epoch == args.epochs - 1:
+            torch.save({
+                'epoch': epoch,
+                'model_state_dict': model.state_dict(),
+                'optimizer_state_dict': optimizer.state_dict(),
+                'loss': loss,
+                'lr': lr
+            }, args.path)
 
 
 def test(model, test_loader):
@@ -156,8 +158,8 @@ def _test_iteration(model, trendData, data, labels, path):
     return original_failed, original_success
 
 def main():
-    model = VAE(134 + 19 * 2, args.latent_size, args.conditional, 2).cuda() if args.cuda \
-        else VAE(134 + 19 * 2, args.latent_size, args.conditional, 2)
+    model = VAE(134 + 19 * 2, 10 * 2, args.latent_size, args.conditional, 2).cuda() if args.cuda \
+        else VAE(134 + 19 * 2, 10 * 2, args.latent_size, args.conditional, 2)
     optimizer = optim.Adam(model.parameters(), lr=args.lr)
     args.path = os.path.join(os.getcwd(), args.path)
     epoch = -1

@@ -163,15 +163,25 @@ class EasyLinear(nn.Module):
     
 
 class VAE(nn.Module):
-    def __init__(self, dim, latent_size, condition=False, num_labels=0):
+    def __init__(self, dim, loads_dim, latent_size, condition=False, num_labels=0):
         super(VAE, self).__init__()
         if condition == False:
             num_labels = 0
         self.condition = condition
         self.num_labels = num_labels
+        self.loads_dim = loads_dim
+        self.dim = dim
         # Define encoder
-        self.features = nn.Sequential(
-          nn.Linear(dim + num_labels, 512),
+        self.loads_features = nn.Sequential(
+            nn.Linear(loads_dim, 512),
+            nn.ReLU(),
+            nn.Linear(512, 1024),  
+            nn.ReLU(),
+            nn.Linear(1024, 512),
+            nn.ReLU()  
+        )
+        self.solution_features = nn.Sequential(
+          nn.Linear(dim - loads_dim + num_labels, 512),
           nn.ReLU(),
           nn.Linear(512, 1024),
           nn.ReLU(),
@@ -182,10 +192,13 @@ class VAE(nn.Module):
           nn.Linear(1024, 512),
           nn.ReLU()
         )
-        self.fc2mu = nn.Linear(512, latent_size)
-        self.fc2Logvar = nn.Linear(512, latent_size)
+        self.fc2mu_loads = nn.Linear(512, latent_size[0])
+        self.fc2Logvar_loads = nn.Linear(512, latent_size[0])
+        self.fc2mu_solution = nn.Linear(512, latent_size[1])
+        self.fc2Logvar_solution = nn.Linear(512, latent_size[1])
+
         self.features_to_img = nn.Sequential(
-            nn.Linear(latent_size + num_labels, 512),
+            nn.Linear(sum(latent_size) + num_labels, 512),
             nn.ReLU(),
             nn.Linear(512, 1024),
             nn.ReLU(),
@@ -208,12 +221,25 @@ class VAE(nn.Module):
 
         return onehot.cuda()    
 
-    def encode(self, x, c):
+    def encode_loads(self, x):
+        x = self.loads_features(x)
+        return self.fc2mu_loads(x), self.fc2Logvar_loads(x)
+
+    def encode_solution(self, x, c):
         if self.condition:
-            x = torch.cat((c, x), dim=-1)
-        x = self.features(x)
-        return self.fc2mu(x), self.fc2Logvar(x)
+            x = torch.cat((x, c), dim=-1)
+        x = self.solution_features(x)
+        return self.fc2mu_solution(x), self.fc2Logvar_solution(x)
     
+    def encode(self, x, c):
+        loads = x[:, :self.loads_dim]
+        solution = x[:, self.loads_dim:]
+        mu_loads, logvar_loads = self.encode_loads(loads)
+        mu_solution, logvar_solution = self.encode_solution(solution, c)
+        mu = torch.cat((mu_loads, mu_solution), dim=-1)
+        logvar = torch.cat((logvar_loads, logvar_solution), dim=-1)
+        return mu, logvar
+
     def reparmeterize(self, mu, logvar):
         std = torch.exp(0.5 * logvar)
         eps = torch.randn_like(std)
@@ -221,7 +247,7 @@ class VAE(nn.Module):
     
     def decode(self, z, c):
         if self.condition:
-            z = torch.cat((c, z), dim=-1)
+            z = torch.cat((z, c), dim=-1)
         res = self.features_to_img(z)
         return res
 
