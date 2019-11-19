@@ -252,18 +252,18 @@ class ConvVAE(nn.Module):
             nn.BatchNorm1d(32),
             nn.MaxPool1d(3),
 
-            nn.Conv1d(32, 32, 3, padding=1),
-            nn.ReLU(),
-            nn.BatchNorm1d(32),
-            nn.MaxPool1d(3),
-
             nn.Conv1d(32, 64, 3, padding=1),
             nn.ReLU(),
             nn.BatchNorm1d(64),
             nn.MaxPool1d(3),
+
+            nn.Conv1d(64, 128, 3, padding=1),
+            nn.ReLU(),
+            nn.BatchNorm1d(128),
+            nn.MaxPool1d(3),
         )
         self.features_to_hidden = nn.Sequential(
-            nn.Linear(64 * self.reside_size, self.hidden_dim),
+            nn.Linear(128 * self.reside_size, self.hidden_dim),
             nn.ReLU()
         )
         self.fc2mu = nn.Linear(self.hidden_dim, latent_size)
@@ -272,17 +272,17 @@ class ConvVAE(nn.Module):
         self.latent_to_features = nn.Sequential(
             nn.Linear(latent_size + num_labels, self.hidden_dim),
             nn.ReLU(),
-            nn.Linear(self.hidden_dim, 64 * self.reside_size),
+            nn.Linear(self.hidden_dim, 128 * self.reside_size),
             nn.ReLU()
         ) 
         self.features_to_img = nn.Sequential(
+            nn.ConvTranspose1d(128, 128, 3, 3),
+            nn.Conv1d(128, 64, 3, padding=1),
+            nn.ReLU(),
+            nn.BatchNorm1d(64),
+
             nn.ConvTranspose1d(64, 64, 3, 3),
             nn.Conv1d(64, 32, 3, padding=1),
-            nn.ReLU(),
-            nn.BatchNorm1d(32),
-
-            nn.ConvTranspose1d(32, 32, 3, 3),
-            nn.Conv1d(32, 32, 3, padding=1),
             nn.ReLU(),
             nn.BatchNorm1d(32),
 
@@ -317,7 +317,7 @@ class ConvVAE(nn.Module):
             c = self.idx2oneHot(c)
             x = torch.cat((x, c), dim=-1)
         x = self.features(x)
-        x = x.view(-1, 64 * self.reside_size)
+        x = x.view(-1, 128 * self.reside_size)
         x = self.features_to_hidden(x)
         return self.fc2mu(x), self.fc2Logvar(x)
     
@@ -330,7 +330,7 @@ class ConvVAE(nn.Module):
         if self.condition:
             c = self.idx2oneHot(c, encode=False)
             z = torch.cat((z, c), dim=-1)
-        features = self.latent_to_features(z).view(-1, 64, self.reside_size)
+        features = self.latent_to_features(z).view(-1, 128, self.reside_size)
         return self.features_to_img(features)
 
     def forward(self, x, c=None):

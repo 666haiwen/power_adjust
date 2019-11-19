@@ -178,17 +178,17 @@ class TrendData(object):
         if 'ac' in content:
             ac_begin = (self.g_len + self.l_len) * 2
             for i in range(self.ac_len):
-                self.ACs[i]['mark'] = 1 if data[ac_begin + i] >= 0.5 else 0
+                self.ACs[i]['mark'] = int(data[ac_begin + i] + 0.5)
         
         if 'g' in content:
             if len(data.shape) == 1:
                 for i in range(self.g_len):
-                    self.generators[i]['Pg'] = max(0, data[(i + self.l_len) * 2])
+                    self.generators[i]['Pg'] = data[(i + self.l_len) * 2]
                     self.generators[i]['Qg'] = data[(i + self.l_len) * 2 + 1]
             else:
                 for i in range(self.g_len):
-                    # self.generators[i]['mark'] = 1 if data[0][i + self.l_len] >= 0.5 else 0
-                    self.generators[i]['Pg'] = max(0, data[1][i + self.l_len])
+                    # self.generators[i]['mark'] = int(data[0][i + self.l_len] + 0.5)
+                    self.generators[i]['Pg'] = data[1][i + self.l_len]
                     self.generators[i]['Qg'] = data[2][i + self.l_len]
                     # self.generators[i]['V0'] = data[3][i + self.l_len]
 
@@ -200,24 +200,23 @@ class TrendData(object):
             mark_generators = sum([x['mark'] for x in self.generators])
             rate_pg = (loads_pg * alpha - generators_pg) / mark_generators
             rate_qg = (loads_qg * alpha - generators_qg) / mark_generators
-        else:
-            rate_qg = rate_pg = 0
+            
+            if 'g' in content:
+                for i in range(self.g_len):
+                    if self.generators[i]['mark'] == 1:
+                        self.generators[i]['Pg'] += rate_pg
+                        self.generators[i]['Qg'] += rate_qg
 
-        if 'g' in content:
-            for i in range(self.g_len):
-                if self.generators[i]['mark'] == 1:
-                    self.generators[i]['Pg'] += rate_pg
-                    self.generators[i]['Qg'] += rate_qg
 
         if 'l' in content:
             for i in range(self.l_len):
                 if len(data.shape) == 1:
-                    self.loads[i]['Pg'] = max(0, data[i * 2])
+                    self.loads[i]['Pg'] = data[i * 2]
                     self.loads[i]['Qg'] = data[i * 2 + 1]
                 else:
-                    self.loads[i]['mark'] = 1 if data[0][i] >= 0.5 else 0
-                    self.loads[i]['Pg'] = max(0, data[1][i] + rate_pg)
-                    self.loads[i]['Qg'] = data[2][i] + rate_qg
+                    self.loads[i]['mark'] =  int(data[0][i] + 0.5)
+                    self.loads[i]['Pg'] = data[1][i]
+                    self.loads[i]['Qg'] = data[2][i]
                     self.loads[i]['V0'] = data[3][i]
         self.__output(content=content)
         return self.run()

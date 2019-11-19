@@ -118,8 +118,27 @@ class dataLoader_2000Nodes(powerDatasetLoader):
 
         return result
 
+    def test_ac(self):
+        base_ac_mark = self.get_ac_data(0)
+        for i in range(1, len(self.dataList['path'])):
+            test_ac_mark = self.get_ac_data(i)
+            diff_ac_mark = base_ac_mark - test_ac_mark
+            if diff_ac_mark.min() == 0 and diff_ac_mark.max() == 0:
+                continue
+            else:
+                print('{} diffierent'.format(i))
+    
+    def get_ac_data(self, data_idx):
+        result = np.zeros(2970)
+        path = self.dataList['path'][data_idx]
+        with open(os.path.join(path,'LF.L2'), 'r', encoding='gbk') as fp:
+            for i, line in enumerate(fp):
+                data = line.split(',')[:-1]
+                result[i] = int(data[0])
+        return result
 
 
 # data = dataLoader_36Nodes('env/data/36nodes_new/')
 data = dataLoader_2000Nodes()
-data.set_dataset()
+data.test_ac()
+# data.set_dataset()

@@ -92,7 +92,7 @@ def train(model, optimizer, train_loader, epoch_begin, lr):
             train_loss += loss.item()
             optimizer.step()
             if batch_idx % args.log_interval == 0:
-                print('Train Epoch: {} [{}/{} ({:.0f}%)]\tAvg Loss: {:.6f}\tLoss: {:.4f}'.format(
+                print('Train Epoch: {} [{}/{} ({:.0f}%)]\tAvg Loss: {:.3f}\tLoss: {:.3f}'.format(
                     epoch, batch_idx * len(inputs), len(train_loader.dataset),
                     100. * batch_idx / len(train_loader),
                     loss.item() / len(inputs), loss.item()))
@@ -106,8 +106,8 @@ def train(model, optimizer, train_loader, epoch_begin, lr):
             print('--------Update Lr[{:.7f}]-------'.format(lr))
         # log
         time_cost = time.time() - before_time
-        print('====> Epoch: {} \tAverage loss : {:.4f}\tTime cost: {:.0f}'.format(
-            epoch, train_loss / len(train_loader.dataset), time_cost))
+        print('====> Epoch: {} \tAverage loss : {:.3f}\tTime cost: {:.0f}\tLR: {:.7f}'.format(
+            epoch, train_loss / len(train_loader.dataset), time_cost, lr))
         if epoch % args.log_interval == 0 or epoch == args.epochs - 1:
             torch.save({
                 'epoch': epoch,
@@ -131,8 +131,9 @@ def test(model, test_loader):
             epoch_fail, epoch_success = _test_iteration(model, trendData, data, labels, path)
             original_success.extend(epoch_success)
             original_failed.extend(epoch_fail)
-    # print('[{}/{}]  original success rate: {:.2f}%'.format(sum(original_success), len(original_success), \
-    #     sum(original_success) / len(original_success) * 100))
+            break
+    print('[{}/{}]  original success rate: {:.2f}%'.format(sum(original_success), len(original_success), \
+        sum(original_success) / len(original_success) * 100))
     print('[{}/{}]  original fail rate: {:.2f}%'.format(sum(original_failed), len(original_failed), \
         sum(original_failed) / len(original_failed) * 100))
 
@@ -140,7 +141,7 @@ def _test_iteration(model, trendData, data, labels, path):
     reverse_labels = 1 - labels
     mu_batch, _ = model.encode(data, labels)
     recon_batch = model.decode(mu_batch, labels)
-    
+
     reverse_recon_batch = model.decode(mu_batch, reverse_labels)
     shape = recon_batch.shape
     original_success = []
@@ -148,23 +149,18 @@ def _test_iteration(model, trendData, data, labels, path):
     for idx in range(shape[0]):
         trendData.reset(path[idx], restate=False)
         if labels[idx] == 0:
-            print('disconvergenced {}'.format(idx))
             new_data = reverse_recon_batch[idx].cpu().numpy()
-            for alpha in [1.0, 1.1, 0.9, 1.2, 0.8]:
+            for alpha in [1.2, 1.1, 1.05, 1.3]:
                 result = trendData.test(new_data, content=CONTENT[IDX], balance=True, alpha=alpha)
                 if result == True:
-                    print('{} convergenced!'.format(idx))
                     break
             original_failed.append(result)
         else:
             continue
-            print('convergenced {}'.format(idx))
-            result = trendData.test(recon_batch[idx].cpu().numpy(), content=['g'], balance=False)
+            result = trendData.test(recon_batch[idx].cpu().numpy(), content=['g', 'l'], balance=False)
             original_success.append(result)
-            if result == True:
-                print('{} convergenced!'.format(idx))
-    print('{}/{}'.format(sum(original_failed), len(original_failed)))
-    # print('{}/{}'.format(sum(original_success), len(original_success)))
+        print('Disconvergenced {}/{}'.format(sum(original_failed), len(original_failed)))
+        print('Convergenced    {}/{}\n'.format(sum(original_success), len(original_success)))
     return original_failed, original_success
 
 def main():
