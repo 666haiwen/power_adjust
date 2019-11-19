@@ -23,8 +23,8 @@ def get_args():
     parser.add_argument('--epochs', type=int, default=200, help='number of epochs of training')
     parser.add_argument('--seed', type=int, default=7,
                         help='random seed (default = 7)')
-    parser.add_argument('--batch-size', type=int, default=512, help='size of the batches')
-    parser.add_argument('--lr', type=float, default=0.0002, help='initial learning rate')
+    parser.add_argument('--batch-size', type=int, default=256, help='size of the batches')
+    parser.add_argument('--lr', type=float, default=1e-3, help='initial learning rate')
     parser.add_argument('--log-interval', type=int, default=20,
                         help='how many batches to wait before logging training status')
     parser.add_argument('--decay_epoch', type=int, default=100, help='epoch to start linearly decaying the learning rate to 0')
@@ -152,7 +152,7 @@ def train(train_loader, epoch_begin):
             epoch, loss_G, loss_identity_A + loss_identity_B, loss_GAN_A2B + loss_GAN_B2A,
             loss_cycle_ABA + loss_cycle_BAB, loss_D_A + loss_D_B))
         # Save models checkpoints
-        if epoch % 20 == 0:
+        if epoch % 20 == 0 or epoch + 1 == args.epochs:
             torch.save({
                 'epoch': epoch,
                 'netG_A2B_state_dict': netG_A2B.state_dict(),

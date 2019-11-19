@@ -163,48 +163,29 @@ class EasyLinear(nn.Module):
     
 
 class VAE(nn.Module):
-    def __init__(self, dim, loads_dim, latent_size, condition=False, num_labels=0):
+    def __init__(self, dim, latent_size, condition=False, num_labels=0):
         super(VAE, self).__init__()
         if condition == False:
             num_labels = 0
         self.condition = condition
         self.num_labels = num_labels
-        self.loads_dim = loads_dim
         self.dim = dim
         # Define encoder
-        self.loads_features = nn.Sequential(
-            nn.Linear(loads_dim, 512),
-            nn.ReLU(),
-            nn.Linear(512, 1024),  
-            nn.ReLU(),
-            nn.Linear(1024, 512),
-            nn.ReLU()  
-        )
-        self.solution_features = nn.Sequential(
-          nn.Linear(dim - loads_dim + num_labels, 512),
+        self.features = nn.Sequential(
+          nn.Linear(dim + num_labels, 512),
           nn.ReLU(),
           nn.Linear(512, 1024),
-          nn.ReLU(),
-          nn.Linear(1024, 2048),
-          nn.ReLU(),
-          nn.Linear(2048, 1024),
           nn.ReLU(),
           nn.Linear(1024, 512),
           nn.ReLU()
         )
-        self.fc2mu_loads = nn.Linear(512, latent_size[0])
-        self.fc2Logvar_loads = nn.Linear(512, latent_size[0])
-        self.fc2mu_solution = nn.Linear(512, latent_size[1])
-        self.fc2Logvar_solution = nn.Linear(512, latent_size[1])
+        self.fc2mu = nn.Linear(512, latent_size)
+        self.fc2Logvar = nn.Linear(512, latent_size)
 
         self.features_to_img = nn.Sequential(
-            nn.Linear(sum(latent_size) + num_labels, 512),
+            nn.Linear(latent_size+ num_labels, 512),
             nn.ReLU(),
             nn.Linear(512, 1024),
-            nn.ReLU(),
-            nn.Linear(1024, 2048),
-            nn.ReLU(),
-            nn.Linear(2048, 1024),
             nn.ReLU(),
             nn.Linear(1024, 512),
             nn.ReLU(),
@@ -221,25 +202,13 @@ class VAE(nn.Module):
 
         return onehot.cuda()    
 
-    def encode_loads(self, x):
-        x = self.loads_features(x)
-        return self.fc2mu_loads(x), self.fc2Logvar_loads(x)
-
-    def encode_solution(self, x, c):
-        if self.condition:
-            x = torch.cat((x, c), dim=-1)
-        x = self.solution_features(x)
-        return self.fc2mu_solution(x), self.fc2Logvar_solution(x)
-    
     def encode(self, x, c):
-        loads = x[:, :self.loads_dim]
-        solution = x[:, self.loads_dim:]
-        mu_loads, logvar_loads = self.encode_loads(loads)
-        mu_solution, logvar_solution = self.encode_solution(solution, c)
-        mu = torch.cat((mu_loads, mu_solution), dim=-1)
-        logvar = torch.cat((logvar_loads, logvar_solution), dim=-1)
-        return mu, logvar
-
+        if self.condition:
+            c = self.idx2oneHot(c)
+            x = torch.cat((x, c), dim=-1)
+        x = self.features(x)
+        return self.fc2mu(x), self.fc2Logvar(x)
+    
     def reparmeterize(self, mu, logvar):
         std = torch.exp(0.5 * logvar)
         eps = torch.randn_like(std)
@@ -247,13 +216,124 @@ class VAE(nn.Module):
     
     def decode(self, z, c):
         if self.condition:
+            c = self.idx2oneHot(c)
             z = torch.cat((z, c), dim=-1)
         res = self.features_to_img(z)
         return res
 
     def forward(self, x, c=None):
+        mu, logvar = self.encode(x, c)
+        z = self.reparmeterize(mu, logvar)
+        return self.decode(z, c), mu, logvar
+
+
+class ConvVAE(nn.Module):
+    def __init__(self, latent_size, input_channel=4, condition=False, num_labels=2):
+        """
+        Shape: 816 + 531 = (1347, 4) + num_labels ==> 1349, 4 + one zeros ==> 1350, 4
+        """
+        super(ConvVAE, self).__init__()
+        if condition == False:
+            num_labels = 0
+        self.condition = condition
+        self.num_labels = num_labels
+        self.input_channel = input_channel
+        self.hidden_dim = 512
+        self.reside_size = 25
+        # Define encoder
+        self.features = nn.Sequential(
+            nn.Conv1d(input_channel, 10, 3, padding=1),
+            nn.ReLU(),
+            nn.BatchNorm1d(10),
+            nn.MaxPool1d(2),
+
+            nn.Conv1d(10, 32, 3, padding=1),
+            nn.ReLU(),
+            nn.BatchNorm1d(32),
+            nn.MaxPool1d(3),
+
+            nn.Conv1d(32, 32, 3, padding=1),
+            nn.ReLU(),
+            nn.BatchNorm1d(32),
+            nn.MaxPool1d(3),
+
+            nn.Conv1d(32, 64, 3, padding=1),
+            nn.ReLU(),
+            nn.BatchNorm1d(64),
+            nn.MaxPool1d(3),
+        )
+        self.features_to_hidden = nn.Sequential(
+            nn.Linear(64 * self.reside_size, self.hidden_dim),
+            nn.ReLU()
+        )
+        self.fc2mu = nn.Linear(self.hidden_dim, latent_size)
+        self.fc2Logvar = nn.Linear(self.hidden_dim, latent_size)
+
+        self.latent_to_features = nn.Sequential(
+            nn.Linear(latent_size + num_labels, self.hidden_dim),
+            nn.ReLU(),
+            nn.Linear(self.hidden_dim, 64 * self.reside_size),
+            nn.ReLU()
+        ) 
+        self.features_to_img = nn.Sequential(
+            nn.ConvTranspose1d(64, 64, 3, 3),
+            nn.Conv1d(64, 32, 3, padding=1),
+            nn.ReLU(),
+            nn.BatchNorm1d(32),
+
+            nn.ConvTranspose1d(32, 32, 3, 3),
+            nn.Conv1d(32, 32, 3, padding=1),
+            nn.ReLU(),
+            nn.BatchNorm1d(32),
+
+            nn.ConvTranspose1d(32, 32, 3, 3),
+            nn.Conv1d(32, 10, 3, padding=1),
+            nn.ReLU(),
+            nn.BatchNorm1d(10),
+
+            nn.ConvTranspose1d(10, 10, 2, 2),
+            nn.Conv1d(10, input_channel, 3),
+            nn.ReLU(),
+            nn.BatchNorm1d(input_channel),
+        )
+    
+    def idx2oneHot(self, idx, encode=True):
+        assert torch.max(idx).item() < self.num_labels
+        
+        if encode:
+            onehot = torch.zeros((idx.size(0), self.input_channel, self.num_labels))
+            for i, v in enumerate(idx.cpu().long()):
+                onehot[i, :, v] = torch.ones(self.input_channel)
+        else:
+            if idx.dim() == 1:
+                idx = idx.unsqueeze(1)
+        
+            onehot = torch.zeros(idx.size(0), self.num_labels)
+            onehot.scatter_(1, idx.cpu().long(), 1)
+        return onehot.cuda()    
+
+    def encode(self, x, c):
         if self.condition:
             c = self.idx2oneHot(c)
+            x = torch.cat((x, c), dim=-1)
+        x = self.features(x)
+        x = x.view(-1, 64 * self.reside_size)
+        x = self.features_to_hidden(x)
+        return self.fc2mu(x), self.fc2Logvar(x)
+    
+    def reparmeterize(self, mu, logvar):
+        std = torch.exp(0.5 * logvar)
+        eps = torch.randn_like(std)
+        return mu + eps * std
+    
+    def decode(self, z, c):
+        if self.condition:
+            c = self.idx2oneHot(c, encode=False)
+            z = torch.cat((z, c), dim=-1)
+        features = self.latent_to_features(z).view(-1, 64, self.reside_size)
+        return self.features_to_img(features)
+
+    def forward(self, x, c=None):
         mu, logvar = self.encode(x, c)
         z = self.reparmeterize(mu, logvar)
         return self.decode(z, c), mu, logvar

@@ -44,8 +44,8 @@ class TrendData(object):
         
         # set params
         self.ac_len = len(self.ACs) if target != 'state-section' else 26 # 26 just for 36nodes (index > 26) are all Shunt capacitor
-        self.g_len = len(self.g_index)
-        self.l_len = len(self.l_index)
+        self.g_len = len(self.generators)
+        self.l_len = len(self.loads)
         self.nodesNum = self.g_len + self.l_len + self.ac_len
         self.state_dim = (FEATURENS_NUM, self.nodesNum)
         # initialize the state
@@ -53,7 +53,7 @@ class TrendData(object):
         self.Pg = 0
 
     
-    def reset(self, path):
+    def reset(self, path, restate=True):
         """
             reset the env.
         """
@@ -63,7 +63,8 @@ class TrendData(object):
         self.generators, self.g_index = self.__load_generators()
         self.loads, self.l_index = self.__load_loads()
         self.ACs = self.__load_AC_lines()
-        self.get_state()
+        if restate:
+            self.get_state()
         if self.target == 'state-section':
             self.run()
             self.ACs_output = self.__load_AC_output_lines()
@@ -77,7 +78,7 @@ class TrendData(object):
         """
             Replace the files in run dir by template dir
         """
-        dirs = ['LF.L0', 'LF.L1', 'LF.L2', 'LF.L3', 'LF.L5', 'LF.L6']
+        dirs = os.listdir(self.path)
         for fileName in dirs:
             copyfile(self.path + '/' + fileName, self.runPath + '/' + fileName)
 
@@ -165,40 +166,60 @@ class TrendData(object):
         # return sum(data[:, 0]), sum(data[:, 1])
 
 
-    def test(self, data, load=False, balance=True):
+    def test(self, data, content=['g'], balance=True, alpha=1.2):
         """
             Test the result by vae.
+            @params:
+                data: numpy data to set generators/loads/acs
+                content: reload content, type: list
+                balance: balance Pg/Qg between generators and loads, default: True
+                alpha: the coefficient of balance, default:1.2
         """
-        def re_sigmoid(x):
-            return np.log(x/(1-x))
-
-        ac_begin = (self.g_len + self.l_len) * 2
-        for i in range(self.ac_len):
-            self.ACs[i]['mark'] = 1 if data[ac_begin + i] >= 0.5 else 0
+        if 'ac' in content:
+            ac_begin = (self.g_len + self.l_len) * 2
+            for i in range(self.ac_len):
+                self.ACs[i]['mark'] = 1 if data[ac_begin + i] >= 0.5 else 0
         
+        if 'g' in content:
+            if len(data.shape) == 1:
+                for i in range(self.g_len):
+                    self.generators[i]['Pg'] = max(0, data[(i + self.l_len) * 2])
+                    self.generators[i]['Qg'] = data[(i + self.l_len) * 2 + 1]
+            else:
+                for i in range(self.g_len):
+                    # self.generators[i]['mark'] = 1 if data[0][i + self.l_len] >= 0.5 else 0
+                    self.generators[i]['Pg'] = max(0, data[1][i + self.l_len])
+                    self.generators[i]['Qg'] = data[2][i + self.l_len]
+                    # self.generators[i]['V0'] = data[3][i + self.l_len]
+
         if balance:
-            loads_pg = sum([x['Pg'] for x in self.loads])
-            generators_pg = sum([x['Pg'] for x in self.generators])
-            diff_pg = max(0, loads_pg * 1.1 - generators_pg) / self.g_len
-            loads_qg = sum([x['Qg'] for x in self.loads])
-            generators_qg = sum([x['Qg'] for x in self.generators])
-            diff_qg = max(0, loads_qg * 1.1 - generators_qg) / self.g_len
+            loads_pg = sum([x['Pg'] * x['mark'] for x in self.loads])
+            loads_qg = sum([x['Qg'] * x['mark'] for x in self.loads])
+            generators_pg = sum([x['Pg'] * x['mark'] for x in self.generators])
+            generators_qg = sum([x['Qg'] * x['mark'] for x in self.generators])
+            mark_generators = sum([x['mark'] for x in self.generators])
+            rate_pg = (loads_pg * alpha - generators_pg) / mark_generators
+            rate_qg = (loads_qg * alpha - generators_qg) / mark_generators
         else:
-            diff_qg = diff_pg = 0
+            rate_qg = rate_pg = 0
 
-        for i in range(self.g_len):
-            # self.generators[i]['Pg'] = re_sigmoid(data[i * 2])
-            # self.generators[i]['Qg'] = re_sigmoid(data[i * 2 + 1])
-            self.generators[i]['Pg'] = max(0, data[(i + self.l_len) * 2] + diff_pg)
-            self.generators[i]['Qg'] = data[(i + self.l_len) * 2 + 1] + diff_qg
+        if 'g' in content:
+            for i in range(self.g_len):
+                if self.generators[i]['mark'] == 1:
+                    self.generators[i]['Pg'] += rate_pg
+                    self.generators[i]['Qg'] += rate_qg
 
-        if load:
+        if 'l' in content:
             for i in range(self.l_len):
-                # self.loads[i]['Pg'] = re_sigmoid(data[(i + self.g_len) * 2])
-                # self.loads[i]['Qg'] = re_sigmoid(data[(i + self.g_len) * 2 + 1])
-                self.loads[i]['Pg'] = max(0, data[i * 2])
-                self.loads[i]['Qg'] = data[i * 2 + 1]
-        self.__output(load=load)
+                if len(data.shape) == 1:
+                    self.loads[i]['Pg'] = max(0, data[i * 2])
+                    self.loads[i]['Qg'] = data[i * 2 + 1]
+                else:
+                    self.loads[i]['mark'] = 1 if data[0][i] >= 0.5 else 0
+                    self.loads[i]['Pg'] = max(0, data[1][i] + rate_pg)
+                    self.loads[i]['Qg'] = data[2][i] + rate_qg
+                    self.loads[i]['V0'] = data[3][i]
+        self.__output(content=content)
         return self.run()
         
 
@@ -495,7 +516,7 @@ class TrendData(object):
                 })
         return loads, index
     
-    def __output(self, load=False):
+    def __output(self, content=['g', 'ac']):
         """
             write the adjust input data to the dst dirs
         """
@@ -504,20 +525,22 @@ class TrendData(object):
                 fp.write(s + ',')
             fp.write('\n')
         
-        with open(os.path.join(self.runPath, 'LF.L2'), 'w+', encoding='utf-8') as fp:
-            for v in self.ACs:
-                data = v['data']
-                data[0] = '{}'.format(v['mark'])
-                fpWrite(fp, data)
+        if 'ac' in content:
+            with open(os.path.join(self.runPath, 'LF.L2'), 'w+', encoding='utf-8') as fp:
+                for v in self.ACs:
+                    data = v['data']
+                    data[0] = '{}'.format(v['mark'])
+                    fpWrite(fp, data)
 
         if self.target == 'state-section' or 'vae' in self.target:
-            with open(os.path.join(self.runPath, 'LF.L5'), 'w+', encoding='utf-8') as fp:
-                for v in self.generators:
-                    data = v['data']
-                    data[3] = '{:.3f}'.format(v['Pg'])
-                    data[4] = '{:.3f}'.format(v['Qg'])
-                    fpWrite(fp, data)
-        if 'vae' in self.target and load:
+            if 'g' in content:
+                with open(os.path.join(self.runPath, 'LF.L5'), 'w+', encoding='utf-8') as fp:
+                    for v in self.generators:
+                        data = v['data']
+                        data[3] = '{:.3f}'.format(v['Pg'])
+                        data[4] = '{:.3f}'.format(v['Qg'])
+                        fpWrite(fp, data)
+        if 'vae' in self.target and 'l' in content:
             with open(os.path.join(self.runPath, 'LF.L6'), 'w+', encoding='utf-8') as fp:
                 for v in self.loads:
                     data = v['data']

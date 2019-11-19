@@ -8,11 +8,7 @@ class Generator(nn.Module):
 
         # Initial convolution block       
         self.model = nn.Sequential(
-            nn.Linear(input_dim, 256),
-            nn.InstanceNorm1d(channel),
-            nn.ReLU(inplace=True),
-
-            nn.Linear(256, 512),
+            nn.Linear(input_dim, 512),
             nn.InstanceNorm1d(channel),
             nn.ReLU(inplace=True),
 
@@ -24,11 +20,7 @@ class Generator(nn.Module):
             nn.InstanceNorm1d(channel),
             nn.ReLU(inplace=True),
 
-            nn.Linear(512, 256),
-            nn.InstanceNorm1d(channel),
-            nn.ReLU(inplace=True),
-
-            nn.Linear(256, output_dim),
+            nn.Linear(512, output_dim),
         )
 
     def forward(self, x):
@@ -39,9 +31,7 @@ class Discriminator(nn.Module):
         super(Discriminator, self).__init__()
 
         self.model = nn.Sequential(
-            nn.Linear(dim, 256),
-            nn.LeakyReLU(negative_slope=0.05),
-            nn.Linear(256, 512),
+            nn.Linear(dim, 512),
             nn.LeakyReLU(negative_slope=0.05),
             nn.Linear(512, 1024),
             nn.LeakyReLU(negative_slope=0.05),

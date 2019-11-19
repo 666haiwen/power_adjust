@@ -5,7 +5,7 @@ import pickle as pkl
 import random
 
 
-class dataLoader_36Nodes(object):
+class powerDatasetLoader(object):
 
     def __init__(self, path):
         self.path = path
@@ -15,32 +15,61 @@ class dataLoader_36Nodes(object):
             'label': [],
             'path': []
         }
-        self.convergence_files = []
-        self.disconvergence_files = []
-        self.acMarks = []
+        random.seed(7)
         with open(path + 'allresult.txt', 'r', encoding='utf-8') as fp:
             for i, line in enumerate(fp):
-                print(i)
                 label =  line.split(' ')
-                # data = self.trendData.set_state_from_files(path +e fileName + '/' + subFile + '/')
-                # filter the data whoses value too large
                 file_path = path + label[0]
-                if len(label) > 2:
-                    self.convergence_files.append(file_path)
-                    label = 1
-                else:
-                    self.disconvergence_files.append(file_path)
-                    label = 0
-                self.dataList['data'].append(self.create_one_data(file_path))
+                label = 1 if len(label) > 2 else 0
                 self.dataList['label'].append(label)
                 self.dataList['path'].append(file_path)
-        random.seed(7)
-        # self.train_test_dataset(self.convergence_files, path + 'convergence.json')
-        # self.train_test_dataset(self.disconvergence_files, path + 'disconvergence.json')
-        self.set_dataset()
+        self.shape = (0,)
+
+    
+    def set_dataset(self):
+        idx_set = set([i for i in range(len(self.dataList['path']))])
+        capacity = len(idx_set)
+        train_idx_set = set(random.sample(range(0, capacity), int(capacity * 0.8)))
+        train_dataset = {
+            'data': np.zeros((len(train_idx_set), ) + self.shape, dtype=np.float32),
+            'label': np.zeros(len(train_idx_set), dtype=np.int32),
+            'path': []
+        }
+        for i, data_idx in enumerate(train_idx_set):
+            print('train data [{}]'.format(i))
+            train_dataset['data'][i] = self.one_data(data_idx)
+            train_dataset['label'][i] = self.dataList['label'][data_idx]
+            train_dataset['path'].append(self.dataList['path'][data_idx])
+
+        test_idx_set = idx_set - train_idx_set
+        test_dataset = {
+            'data': np.zeros((len(test_idx_set), ) + self.shape, dtype=np.float32),
+            'label': np.zeros(len(test_idx_set), dtype=np.int32),
+            'path': []
+        }
+        for i, data_idx in enumerate(test_idx_set):
+            print('test data [{}]'.format(i))
+            test_dataset['data'][i] = self.one_data(data_idx)
+            test_dataset['label'][i] = self.dataList['label'][data_idx]
+            test_dataset['path'].append(self.dataList['path'][data_idx])
+        with open(self.path + 'train.pkl', 'wb') as fp:
+            pkl.dump(train_dataset, fp)
+        with open(self.path + 'test.pkl', 'wb') as fp:
+            pkl.dump(test_dataset, fp)
+    
+
+    def one_data(self, data_idx):
+        return np.zeros(self.shape, dtype=np.float32)
 
 
-    def create_one_data(self, path):
+class dataLoader_36Nodes(powerDatasetLoader):
+
+    def __init__(self, path='env/data/36nodes_new/'):
+        super(dataLoader_36Nodes, self).__init__(path)
+        self.shape = (172, )
+ 
+    def one_data(self, data_idx):
+        path = self.dataList['path'][data_idx]
         generators = []
         with open(os.path.join(path, 'LF.L5'), 'r', encoding='gbk') as fp:
             for i, line in enumerate(fp):
@@ -58,66 +87,39 @@ class dataLoader_36Nodes(object):
             for line in fp:
                 data = line.split(',')[:-1]
                 ACs.append(int(data[0]))
-        return np.array(loads + generators + ACs)
-        
-
-    def train_test_dataset(self, fileList, save_path=None):
-        num = len(fileList)
-        testDataFlag = [False for i in range(num)]
-        testNum = int(num * 0.2)
-        while sum(testDataFlag) < testNum:
-            randInt = random.randint(0, num - 1)
-            while testDataFlag[randInt]:
-                randInt = random.randint(0, num - 1)
-            testDataFlag[randInt] = True
-
-        test_dataset = []
-        train_dataset = []
-        for i, flag in enumerate(testDataFlag):
-            if flag:
-                test_dataset.append(fileList[i])
-            else:
-                train_dataset.append(fileList[i])
-        
-        res = {
-            'train': train_dataset,
-            'test': test_dataset
-        }
-        if save_path != None:
-            with open(save_path, 'w', encoding='utf-8') as fp:
-                json.dump(res, fp)
-        return res
+        return np.array(loads + generators + ACs, dtype=np.float32)
     
+
+class dataLoader_2000Nodes(powerDatasetLoader):
+    def __init__(self, path='env/data/dongbei_LF-2000/'):
+        """
+        loads: (816, 4) Marks, Pg, Qg, Vbase
+        generators: (531, 4) Marks, Pg, Qg, Vbase
+        acs: (2970, 1) Marks
+        """
+        super(dataLoader_2000Nodes, self).__init__(path)
+        self.loads_num = 816
+        self.generators_num = 531
+        self.shape = (816 + 531, 4)
     
-    def set_dataset(self):
-        idx_set = set([i for i in range(len(self.dataList['data']))])
-        capacity = len(idx_set)
-        train_idx_set = set(random.sample(range(0, capacity), int(capacity * 0.8)))
-        shape = self.dataList['data'][0].shape
-        train_dataset = {
-            'data': np.zeros((len(train_idx_set), shape[0])),
-            'label': np.zeros(len(train_idx_set), dtype=np.int32),
-            'path': []
-        }
-        for i, data_idx in enumerate(train_idx_set):
-            train_dataset['data'][i] = self.dataList['data'][data_idx]
-            train_dataset['label'][i] = self.dataList['label'][data_idx]
-            train_dataset['path'].append(self.dataList['path'][data_idx])
+    def one_data(self, data_idx):
+        result = np.zeros(self.shape, dtype=np.float32)
+        path = self.dataList['path'][data_idx]
+        with open(os.path.join(path,'LF.L6'), 'r', encoding='gbk') as fp:
+            for i, line in enumerate(fp):
+                data = line.split(',')[:-1]
+                result[i] = np.array([float(data[0]), float(data[4]), float(data[5]), float(data[6])])
 
-        test_idx_set = idx_set - train_idx_set
-        test_dataset = {
-            'data': np.zeros((len(test_idx_set), shape[0])),
-            'label': np.zeros(len(test_idx_set), dtype=np.int32),
-            'path': []
-        }
-        for i, data_idx in enumerate(test_idx_set):
-            test_dataset['data'][i] = self.dataList['data'][data_idx]
-            test_dataset['label'][i] = self.dataList['label'][data_idx]
-            test_dataset['path'].append(self.dataList['path'][data_idx])
-        with open(self.path + 'train.pkl', 'wb') as fp:
-            pkl.dump(train_dataset, fp)
-        with open(self.path + 'test.pkl', 'wb') as fp:
-            pkl.dump(test_dataset, fp)
+        with open(os.path.join(path, 'LF.L5'), 'r', encoding='gbk') as fp:
+            for i, line in enumerate(fp):
+                data = line.split(',')[:-1]
+                result[i + self.loads_num] = \
+                    np.array([float(data[0]), float(data[3]), float(data[4]), float(data[5])])
+
+        return result
 
 
-data = dataLoader_36Nodes('env/data/36nodes_new/')
+
+# data = dataLoader_36Nodes('env/data/36nodes_new/')
+data = dataLoader_2000Nodes()
+data.set_dataset()
