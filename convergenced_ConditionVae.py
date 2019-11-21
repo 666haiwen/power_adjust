@@ -42,9 +42,9 @@ def get_args():
                         help='path to model saving')
     parser.add_argument('--load-checkpoint', type=bool, default=True,
                         help='load history model or not (default = True)')
-    parser.add_argument('--lr', type=int, default=1e-3,
-                        help='learning rate of training (default = 1e-3)')
-    parser.add_argument('--log-interval', type=int, default=20,
+    parser.add_argument('--lr', type=int, default=1e-4,
+                        help='learning rate of training (default = 1e-4)')
+    parser.add_argument('--log-interval', type=int, default=50,
                         help='how many batches to wait before logging training status')
     parser.add_argument('--sample', type=bool, default=False,
                         help='Test to get sample img or not')
@@ -67,8 +67,11 @@ def adjust_learning_rate(lr, optimizer):
 
 def loss_function(recon_x, x, mu, logvar):
     # BCE = F.binary_cross_entropy(recon_x, x, reduction='sum')
-    BCE = F.mse_loss(recon_x[loads_num * 2:], x[loads_num * 2:], reduction='sum') + \
-        args.beta * F.mse_loss(recon_x[: loads_num * 2], x[: loads_num * 2], reduction='sum')
+    if IDX == 1:
+        BCE = F.mse_loss(recon_x, x, reduction='sum')
+    else:
+        BCE = F.mse_loss(recon_x[:, loads_num * 2:], x[:, loads_num * 2], reduction='sum') + \
+            args.beta * F.mse_loss(recon_x[:, :loads_num * 2], x[:, :loads_num * 2], reduction='sum')
     # KL_Distance : 0.5 * sum(1 + log(sigma^2) - mu^2 - sigma^2)
     KLD = 0.5 * torch.sum(1 + logvar - mu ** 2 - logvar.exp())
     return BCE - KLD
@@ -131,7 +134,8 @@ def test(model, test_loader):
             epoch_fail, epoch_success = _test_iteration(model, trendData, data, labels, path)
             original_success.extend(epoch_success)
             original_failed.extend(epoch_fail)
-            break
+    if len(original_success) == 0:
+        original_success.append(0)
     print('[{}/{}]  original success rate: {:.2f}%'.format(sum(original_success), len(original_success), \
         sum(original_success) / len(original_success) * 100))
     print('[{}/{}]  original fail rate: {:.2f}%'.format(sum(original_failed), len(original_failed), \
@@ -149,15 +153,16 @@ def _test_iteration(model, trendData, data, labels, path):
     for idx in range(shape[0]):
         trendData.reset(path[idx], restate=False)
         if labels[idx] == 0:
+            # continue
             new_data = reverse_recon_batch[idx].cpu().numpy()
-            for alpha in [1.2, 1.1, 1.05, 1.3]:
+            for alpha in [0.906]:
                 result = trendData.test(new_data, content=CONTENT[IDX], balance=True, alpha=alpha)
                 if result == True:
                     break
             original_failed.append(result)
         else:
             continue
-            result = trendData.test(recon_batch[idx].cpu().numpy(), content=['g', 'l'], balance=False)
+            result = trendData.test(recon_batch[idx].cpu().numpy(), content=['g', 'l'], balance=True, alpha=1.05)
             original_success.append(result)
         print('Disconvergenced {}/{}'.format(sum(original_failed), len(original_failed)))
         print('Convergenced    {}/{}\n'.format(sum(original_success), len(original_success)))
@@ -193,7 +198,7 @@ if __name__ == "__main__":
     args = get_args()
     kwargs = {'num_workers': 1, 'pin_memory': True} if args.cuda \
     else {'num_workers': args.num_workers}
-    torch.manual_seed(args.seed)
+    # torch.manual_seed(args.seed)
 
     if IDX == 1:
         train_loader = get_case2k_dataloader(batch_size=args.batch_size)

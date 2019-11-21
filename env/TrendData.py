@@ -187,10 +187,10 @@ class TrendData(object):
                     self.generators[i]['Qg'] = data[(i + self.l_len) * 2 + 1]
             else:
                 for i in range(self.g_len):
-                    # self.generators[i]['mark'] = int(data[0][i + self.l_len] + 0.5)
+                    self.generators[i]['mark'] = int(data[0][i + self.l_len] + 0.5)
                     self.generators[i]['Pg'] = data[1][i + self.l_len]
                     self.generators[i]['Qg'] = data[2][i + self.l_len]
-                    # self.generators[i]['V0'] = data[3][i + self.l_len]
+                    self.generators[i]['V0'] = data[3][i + self.l_len]
 
         if balance:
             loads_pg = sum([x['Pg'] * x['mark'] for x in self.loads])
@@ -217,7 +217,7 @@ class TrendData(object):
                     self.loads[i]['mark'] =  int(data[0][i] + 0.5)
                     self.loads[i]['Pg'] = data[1][i]
                     self.loads[i]['Qg'] = data[2][i]
-                    self.loads[i]['V0'] = data[3][i]
+                    # self.loads[i]['V0'] = data[3][i]
         self.__output(content=content)
         return self.run()
         

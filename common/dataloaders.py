@@ -14,7 +14,7 @@ def get_case39_dataloader(batch_size=512,
         path_to_data = 'env/data/36nodes_new/test.pkl'
     case39_data = Case39Dataset(path_to_data, test=test, gan=gan)
     case39_loader = DataLoader(case39_data, batch_size=batch_size,
-                                 shuffle=True, num_workers=num_workers)
+                                 shuffle=False, num_workers=num_workers)
     return case39_loader
 
 
@@ -92,7 +92,7 @@ def get_case2k_dataloader(batch_size=512,
         path_to_data = 'env/data/dongbei_LF-2000/test.pkl'
     case2k_data = Case2KDataset(path_to_data, test=test)
     case2k_loader = DataLoader(case2k_data, batch_size=batch_size,
-                                 shuffle=True, num_workers=num_workers)
+                                 shuffle=False, num_workers=num_workers)
     return case2k_loader
 
 
@@ -101,6 +101,7 @@ class Case2KDataset(Dataset):
         Data shape (numbers, 4):
             (mark, pg, qg, vBase) of loads
             (mark, pg, qg, vBase) of generators
+        numbers: 1347
     """
     def __init__(self, path_to_data, test=False):
         """
@@ -117,9 +118,9 @@ class Case2KDataset(Dataset):
             if test:
                 self.path = self.dataset['path']
         self.data = self.data.swapaxes(1, 2)
-        shape = self.data.shape
-        new_data = np.zeros((shape[0], shape[1], 1), dtype=np.float32)
-        self.data = np.concatenate((self.data, new_data), axis=-1)
+        # shape = self.data.shape
+        # new_data = np.zeros((shape[0], shape[1], 3), dtype=np.float32)
+        # self.data = np.concatenate((self.data, new_data), axis=-1)
 
 
     def __len__(self):
