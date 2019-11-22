@@ -166,7 +166,7 @@ class TrendData(object):
         # return sum(data[:, 0]), sum(data[:, 1])
 
 
-    def test(self, data, content=['g'], balance=True, alpha=1.2):
+    def test(self, data, content=['g'], balance=True, alpha_Pg=1.0, alpha_Qg=1.0):
         """
             Test the result by vae.
             @params:
@@ -198,8 +198,8 @@ class TrendData(object):
             generators_pg = sum([x['Pg'] * x['mark'] for x in self.generators])
             generators_qg = sum([x['Qg'] * x['mark'] for x in self.generators])
             mark_generators = sum([x['mark'] for x in self.generators])
-            rate_pg = (loads_pg * alpha - generators_pg) / mark_generators
-            rate_qg = (loads_qg * alpha - generators_qg) / mark_generators
+            rate_pg = (loads_pg * alpha_Pg - generators_pg) / mark_generators
+            rate_qg = (loads_qg * alpha_Qg - generators_qg) / mark_generators
             
             if 'g' in content:
                 for i in range(self.g_len):
@@ -217,7 +217,7 @@ class TrendData(object):
                     self.loads[i]['mark'] =  int(data[0][i] + 0.5)
                     self.loads[i]['Pg'] = data[1][i]
                     self.loads[i]['Qg'] = data[2][i]
-                    # self.loads[i]['V0'] = data[3][i]
+                    self.loads[i]['V0'] = data[3][i]
         self.__output(content=content)
         return self.run()
         
@@ -536,13 +536,17 @@ class TrendData(object):
                 with open(os.path.join(self.runPath, 'LF.L5'), 'w+', encoding='utf-8') as fp:
                     for v in self.generators:
                         data = v['data']
+                        data[0] = '{}'.format(v['mark'])
                         data[3] = '{:.3f}'.format(v['Pg'])
                         data[4] = '{:.3f}'.format(v['Qg'])
+                        data[5] = '{:.3f}'.format(v['V0'])
                         fpWrite(fp, data)
         if 'vae' in self.target and 'l' in content:
             with open(os.path.join(self.runPath, 'LF.L6'), 'w+', encoding='utf-8') as fp:
                 for v in self.loads:
                     data = v['data']
+                    data[0] = '{}'.format(v['mark'])
                     data[4] = '{:.3f}'.format(v['Pg'])
                     data[5] = '{:.3f}'.format(v['Qg'])
+                    data[6] = '{:.3f}'.format(v['V0'])
                     fpWrite(fp, data)

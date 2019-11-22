@@ -15,7 +15,7 @@ from env.TrendData import TrendData
 os.environ['CUDA_VISIBLE_DEVICES'] = '0'
 IDX = 1
 DATA_PATH = ['env/data/36nodes_new/1/11', 'env/data/dongbei_LF-2000/dataset/1/11/']
-PATH = ['model/case39_cvae', 'model/case2K_cvae']
+PATH = ['model/case39_cvae', 'model/case2K_cvae_128.pth']
 CONTENT = [['g', 'ac'], ['g']]
 def get_args():
     parser = argparse.ArgumentParser(description='VAE MINST Example')
@@ -27,10 +27,11 @@ def get_args():
                         help='path to model saving')
     parser.add_argument('--data-path', type=str, default=DATA_PATH[IDX],
                         help='path to model saving')
+    parser.add_argument('--latent-size', type=int, default=128,
+                        help='number of latents (default = 128)')
     parser.add_argument('--load-checkpoint', type=bool, default=True,
                         help='load history model or not (default = True)')
     args = parser.parse_args()
-    args.path = args.path + '_enhanced_loads_beta{:.1f}_{}.pth'.format(args.beta, args.latent_size)
     args.cuda = args.cuda and torch.cuda.is_available()
     return args
 
@@ -58,7 +59,7 @@ def _test_iteration(model, trendData, data, labels, path):
     reverse_labels = 1 - labels
     mu_batch, _ = model.encode(data, labels)
     recon_batch = model.decode(mu_batch, labels)
-
+ 
     reverse_recon_batch = model.decode(mu_batch, reverse_labels)
     shape = recon_batch.shape
     original_success = []
@@ -68,14 +69,18 @@ def _test_iteration(model, trendData, data, labels, path):
         if labels[idx] == 0:
             # continue
             new_data = reverse_recon_batch[idx].cpu().numpy()
-            for alpha in [0.906]:
-                result = trendData.test(new_data, content=CONTENT[IDX], balance=True, alpha=alpha)
+            for alpha_Pg in [0.9, 1.0, 0.95]:
+                for alpha_Qg in [0.9, 1.0, 0.95]:
+                    result = trendData.test(new_data, content=CONTENT[IDX], 
+                                            balance=True, alpha_Pg=alpha_Pg, alpha_Qg=alpha_Qg)
+                    if result == True:
+                        break
                 if result == True:
                     break
             original_failed.append(result)
         else:
             continue
-            result = trendData.test(recon_batch[idx].cpu().numpy(), content=['g', 'l'], balance=True, alpha=1.05)
+            result = trendData.test(recon_batch[idx].cpu().numpy(), content=['g', 'l'], balance=False)
             original_success.append(result)
         print('Disconvergenced {}/{}'.format(sum(original_failed), len(original_failed)))
         print('Convergenced    {}/{}\n'.format(sum(original_success), len(original_success)))
@@ -83,22 +88,19 @@ def _test_iteration(model, trendData, data, labels, path):
 
 def main():
     if IDX == 0:
-        model = VAE(134 + 19 * 2, args.latent_size, args.conditional, 2)
+        model = VAE(134 + 19 * 2, args.latent_size, True, 2)
     elif IDX == 1:
-        model = ConvVAE(args.latent_size, condition=args.conditional, num_labels=2)
+        model = ConvVAE(args.latent_size, condition=True, num_labels=2)
     if args.cuda:
         model = model.cuda()
-    optimizer = optim.Adam(model.parameters(), lr=args.lr)
     args.path = os.path.join(os.getcwd(), args.path)
     if args.load_checkpoint:
         if os.path.exists(args.path):
             checkpoint = torch.load(args.path)
             model.load_state_dict(checkpoint['model_state_dict'])
-            optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
         else:
             print('Doesn\'t find checkpoint in ' + args.path)
             return
-    print('Finish train!\nBegin test.......')
     test(model, test_loader)
 
 

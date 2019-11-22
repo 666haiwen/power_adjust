@@ -273,14 +273,14 @@ class dataLoader_2000Nodes(powerDatasetLoader):
         # plt.show()
 
         # Marks
-        plt.plot(disconvergenced_x, disconvergenced[:, 8], color='green', label='DisGeneratorMark')
-        plt.plot(disconvergenced_x, disconvergenced[:, 9], color='red', label='DisLoadsMark')
-        plt.legend()
-        plt.show()
-        plt.plot(convergenced_x, convergenced[:, 8], color='green', label='GeneratorMark')
-        plt.plot(convergenced_x, convergenced[:, 9], color='red', label='LoadsMark')
-        plt.legend()
-        plt.show()
+        # plt.plot(disconvergenced_x, disconvergenced[:, 8], color='green', label='DisGeneratorMark')
+        # plt.plot(disconvergenced_x, disconvergenced[:, 9], color='red', label='DisLoadsMark')
+        # plt.legend()
+        # plt.show()
+        # plt.plot(convergenced_x, convergenced[:, 8], color='green', label='GeneratorMark')
+        # plt.plot(convergenced_x, convergenced[:, 9], color='red', label='LoadsMark')
+        # plt.legend()
+        # plt.show()
 
     def get_ac_data(self, data_idx):
         result = np.zeros(2970)
