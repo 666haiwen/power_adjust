@@ -20,7 +20,7 @@ from env.TrendData import TrendData
 
 
 os.environ['CUDA_VISIBLE_DEVICES'] = '0'
-IDX = 1
+IDX = 0
 DATA_PATH = ['env/data/36nodes_new/1/11', 'env/data/dongbei_LF-2000/dataset/1/11/']
 PATH = ['model/case39_cvae', 'model/case2K_cvae']
 def get_args():
@@ -50,7 +50,7 @@ def get_args():
     parser.add_argument('--conditional',  type=bool, default=True)
     parser.add_argument('--beta', type=float, default=1.0, help='weight of loads mse')
     args = parser.parse_args()
-    args.path = args.path + '_enhanced_loads_beta{:.1f}_{}.pth'.format(args.beta, args.latent_size)
+    args.path = args.path + '_beta{:.1f}_{}.pth'.format(args.beta, args.latent_size)
     args.cuda = args.cuda and torch.cuda.is_available()
     return args
 
@@ -67,7 +67,7 @@ def loss_function(recon_x, x, mu, logvar):
     if IDX == 1:
         BCE = F.mse_loss(recon_x, x, reduction='sum')
     else:
-        BCE = F.mse_loss(recon_x[:, loads_num * 2:], x[:, loads_num * 2], reduction='sum') + \
+        BCE = F.mse_loss(recon_x[:, loads_num * 2:], x[:, loads_num * 2:], reduction='sum') + \
             args.beta * F.mse_loss(recon_x[:, :loads_num * 2], x[:, :loads_num * 2], reduction='sum')
     # KL_Distance : 0.5 * sum(1 + log(sigma^2) - mu^2 - sigma^2)
     KLD = 0.5 * torch.sum(1 + logvar - mu ** 2 - logvar.exp())
@@ -120,9 +120,9 @@ def train(model, optimizer, train_loader, epoch_begin, lr):
 
 def main():
     if IDX == 0:
-        model = VAE(134 + 19 * 2, args.latent_size, args.conditional, 2)
+        model = VAE(args.latent_size, input_channel=2, condition=args.conditional, num_labels=2)
     elif IDX == 1:
-        model = ConvVAE(args.latent_size, condition=args.conditional, num_labels=2)
+        model = ConvVAE(args.latent_size, input_channel=4, condition=args.conditional, num_labels=2)
     if args.cuda:
         model = model.cuda()
     optimizer = optim.Adam(model.parameters(), lr=args.lr)
@@ -147,7 +147,6 @@ if __name__ == "__main__":
     args = get_args()
     kwargs = {'num_workers': 1, 'pin_memory': True} if args.cuda \
     else {'num_workers': args.num_workers}
-    # torch.manual_seed(args.seed)
 
     if IDX == 1:
         train_loader = get_case2k_dataloader(batch_size=args.batch_size)
@@ -156,9 +155,6 @@ if __name__ == "__main__":
         train_loader = get_case39_dataloader(batch_size=args.batch_size)
         test_loader = get_case39_dataloader(batch_size=args.batch_size, test=True)
 
-    # generators_num = 9
-    # loads_num = 10
-
-    loads_num = 816
-    generators_num = 531
+    loads_num = [10, 816][IDX]
+    generators_num = [9, 531][IDX]
     main()

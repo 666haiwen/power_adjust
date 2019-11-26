@@ -50,6 +50,8 @@ class Case39Dataset(Dataset):
                     self.disconvergenced_items.append(i)
             self.convergenced_len = len(self.convergenced_items)
             self.disconvergenced_len = len(self.disconvergenced_items)
+        else:
+            self.data = self.data.swapaxes(1, 2)
 
     def __len__(self):
         if not self.gan:
@@ -62,8 +64,6 @@ class Case39Dataset(Dataset):
             sample = self.data[idx]
             label = self.label[idx]
 
-            # Add extra dimension to turn shape into (H, W) -> (H, W, C)
-            # sample = sample.reshape((1,) + sample.shape)
             sample = torch.from_numpy(sample).float()
             if not self.test:
                 return sample, label
@@ -130,10 +130,7 @@ class Case2KDataset(Dataset):
         sample = self.data[idx]
         label = self.label[idx]
 
-        # Add extra dimension to turn shape into (H, W) -> (H, W, C)
-        # sample = sample.reshape((1,) + sample.shape)
         sample = torch.from_numpy(sample).float()
-        # sample = torch.sigmoid(torch.from_numpy(sample).float())
         if not self.test:
             return sample, label
         else:

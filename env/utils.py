@@ -64,31 +64,37 @@ class powerDatasetLoader(object):
 
 
 class dataLoader_36Nodes(powerDatasetLoader):
-
     def __init__(self, path='env/data/36nodes_new/'):
+        """
+        loads: (10, 2) Pg, Qg
+        generators: (9, 2) Pg, Qg
+        Ac: (134,) => (67, 0) Mark Mark
+        """
         super(dataLoader_36Nodes, self).__init__(path)
-        self.shape = (172, )
+        self.loads_num = 10
+        self.generators_num = 9
+        self.ac_num = 134
+        self.shape = (86, 2)
  
     def one_data(self, data_idx):
         path = self.dataList['path'][data_idx]
-        generators = []
-        with open(os.path.join(path, 'LF.L5'), 'r', encoding='gbk') as fp:
-            for i, line in enumerate(fp):
-                data = line.split(',')[:-1]
-                generators.extend([float(data[3]), float(data[4])])
-        
-        loads = []
+        result = np.zeros(self.shape, dtype=np.float32)
         with open(os.path.join(path,'LF.L6'), 'r', encoding='gbk') as fp:
             for i, line in enumerate(fp):
                 data = line.split(',')[:-1]
-                loads.extend([float(data[4]), float(data[5])])
-        
-        ACs = []
-        with open(os.path.join(path, 'LF.L2'), 'r', encoding='gbk') as fp:
-            for line in fp:
+                result[i] = np.array([float(data[4]), float(data[5])])
+
+        with open(os.path.join(path, 'LF.L5'), 'r', encoding='gbk') as fp:
+            for i, line in enumerate(fp):
                 data = line.split(',')[:-1]
-                ACs.append(int(data[0]))
-        return np.array(loads + generators + ACs, dtype=np.float32)
+                result[i + self.loads_num] = \
+                    np.array([float(data[3]), float(data[4])])
+                
+        with open(os.path.join(path, 'LF.L2'), 'r', encoding='gbk') as fp:
+            for i, line in enumerate(fp):
+                data = line.split(',')[:-1]
+                result[int(i / 2) + self.loads_num + self.generators_num][i % 2] = float(data[0])
+        return result
     
 
 class dataLoader_2000Nodes(powerDatasetLoader):
@@ -292,9 +298,9 @@ class dataLoader_2000Nodes(powerDatasetLoader):
         return result
 
 
-# data = dataLoader_36Nodes('env/data/36nodes_new/')
-data = dataLoader_2000Nodes()
+data = dataLoader_36Nodes('env/data/36nodes_new/')
+# data = dataLoader_2000Nodes()
 # data.set_pg_qg('env/data/dongbei_LF-2000/train.pkl')
-data.plot_pg_qg()
+# data.plot_pg_qg()
 
-# data.set_dataset()
+data.set_dataset()
