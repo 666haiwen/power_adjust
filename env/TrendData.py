@@ -166,7 +166,7 @@ class TrendData(object):
         # return sum(data[:, 0]), sum(data[:, 1])
 
 
-    def test(self, data, content=['g'], balance=True, alpha_Pg=1.0, alpha_Qg=1.0):
+    def test(self, data, content=['g'], dataset=0, balance=True, alpha_Pg=1.0, alpha_Qg=1.0):
         """
             Test the result by vae.
             @params:
@@ -176,15 +176,15 @@ class TrendData(object):
                 alpha: the coefficient of balance, default:1.2
         """
         if 'ac' in content:
-            ac_begin = (self.g_len + self.l_len) * 2
+            ac_begin = self.g_len + self.l_len
             for i in range(self.ac_len):
-                self.ACs[i]['mark'] = int(data[ac_begin + i] + 0.5)
+                self.ACs[i]['mark'] = int(data[i % 2][ac_begin + int(i / 2)] + 0.5)
         
         if 'g' in content:
-            if len(data.shape) == 1:
+            if dataset == 0:
                 for i in range(self.g_len):
-                    self.generators[i]['Pg'] = data[(i + self.l_len) * 2]
-                    self.generators[i]['Qg'] = data[(i + self.l_len) * 2 + 1]
+                    self.generators[i]['Pg'] = data[0][i + self.l_len]
+                    self.generators[i]['Qg'] = data[1][i + self.l_len]
             else:
                 for i in range(self.g_len):
                     self.generators[i]['mark'] = int(data[0][i + self.l_len] + 0.5)
@@ -210,9 +210,9 @@ class TrendData(object):
 
         if 'l' in content:
             for i in range(self.l_len):
-                if len(data.shape) == 1:
-                    self.loads[i]['Pg'] = data[i * 2]
-                    self.loads[i]['Qg'] = data[i * 2 + 1]
+                if dataset == 0:
+                    self.loads[i]['Pg'] = data[0][i]
+                    self.loads[i]['Qg'] = data[1][i]
                 else:
                     self.loads[i]['mark'] =  int(data[0][i] + 0.5)
                     self.loads[i]['Pg'] = data[1][i]

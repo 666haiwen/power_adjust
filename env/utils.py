@@ -25,6 +25,10 @@ class powerDatasetLoader(object):
                 self.dataList['label'].append(label)
                 self.dataList['path'].append(file_path)
         self.shape = (0,)
+        self.mark = False
+        self.loads_num = 0
+        self.generators_num = 0
+        self.key_dict = {}
 
     
     def set_dataset(self):
@@ -61,6 +65,170 @@ class powerDatasetLoader(object):
 
     def one_data(self, data_idx):
         return np.zeros(self.shape, dtype=np.float32)
+    
+
+    def set_pg_qg(self, path):
+        with open(path, 'rb') as fp:
+            dataset = pkl.load(fp)
+            all_data = dataset['data']
+            label = dataset['label']
+        key_dict = self.key_dict
+        all_data = all_data.swapaxes(1, 2)
+        convergenced_num = sum(label)
+        disconvergenced_num = len(label) - convergenced_num
+
+        # GeneratorPgSum
+        # GeneratorQgSum
+        # GeneratorPgMarkSum
+        # GeneratorQgMarkSum
+        # LoadsPgSum
+        # LoadsQgSum
+        # LoadsPgMarkSum
+        # LoadsQgMarkSum
+        # GeneratorMarkSum
+        # LoadsMarkSum
+        convergenced = np.zeros((convergenced_num, 10))
+        disconvergenced = np.zeros((disconvergenced_num, 10))
+        convergenced_cnt = disconvergenced_cnt = 0
+        end_index = self.loads_num + self.generators_num
+        for i in range(label.shape[0]):
+            data = all_data[i]
+            if label[i] == 1:
+                convergenced[convergenced_cnt][0] = data[key_dict['pg'], self.loads_num:end_index].sum()
+                convergenced[convergenced_cnt][1] = data[key_dict['qg'], self.loads_num:end_index].sum()
+                convergenced[convergenced_cnt][4] = sum(data[key_dict['pg'], :self.loads_num])
+                convergenced[convergenced_cnt][5] = sum(data[key_dict['qg'], :self.loads_num])
+                
+                if self.mark:
+                    convergenced[convergenced_cnt][2] = sum(data[key_dict['pg'], self.loads_num:end_index] * data[key_dict['mark'], self.loads_num:end_index])
+                    convergenced[convergenced_cnt][3] = sum(data[key_dict['qg'], self.loads_num:end_index] * data[key_dict['mark'], self.loads_num:end_index])
+                    convergenced[convergenced_cnt][6] = sum(data[key_dict['pg'], :self.loads_num] * data[key_dict['mark'], :self.loads_num])
+                    convergenced[convergenced_cnt][7] = sum(data[key_dict['qg'], :self.loads_num] * data[key_dict['mark'], :self.loads_num])
+                    convergenced[convergenced_cnt][8] = sum(data[key_dict['mark'], self.loads_num:end_index])
+                    convergenced[convergenced_cnt][9] = sum(data[key_dict['mark'], :self.loads_num])
+
+
+                convergenced_cnt += 1
+            else:
+                disconvergenced[disconvergenced_cnt][0] = sum(data[key_dict['pg'], self.loads_num:end_index])
+                disconvergenced[disconvergenced_cnt][1] = sum(data[key_dict['qg'], self.loads_num:end_index])
+                disconvergenced[disconvergenced_cnt][4] = sum(data[key_dict['pg'], :self.loads_num])
+                disconvergenced[disconvergenced_cnt][5] = sum(data[key_dict['qg'], :self.loads_num])
+                if self.mark:
+                    disconvergenced[disconvergenced_cnt][2] = sum(data[key_dict['pg'], self.loads_num:end_index] * data[key_dict['mark'], self.loads_num:end_index])
+                    disconvergenced[disconvergenced_cnt][3] = sum(data[key_dict['qg'], self.loads_num:end_index] * data[key_dict['mark'], self.loads_num:end_index])
+                    disconvergenced[disconvergenced_cnt][6] = sum(data[key_dict['pg'], :self.loads_num] * data[key_dict['mark'], :self.loads_num])
+                    disconvergenced[disconvergenced_cnt][7] = sum(data[key_dict['qg'], :self.loads_num] * data[key_dict['mark'], :self.loads_num])
+                    disconvergenced[disconvergenced_cnt][8] = sum(data[key_dict['mark'], self.loads_num:end_index])
+                    disconvergenced[disconvergenced_cnt][9] = sum(data[key_dict['mark'], :self.loads_num])
+
+                disconvergenced_cnt += 1
+        
+        np.save(self.path + 'convergenced_features.npy', convergenced)
+        np.save(self.path + 'disconvergenced_features.npy', disconvergenced)
+    
+    def plot_pg_qg(self, plot=False):
+        convergenced = np.load(self.path + 'convergenced_features.npy')
+        disconvergenced = np.load(self.path + 'disconvergenced_features.npy')
+
+        print('----------Convergenced Samples----------')
+        if self.mark:
+            print('Average of generator marks: {:.3f}'.format(convergenced[:, 8].mean()))
+            print('Average of Loads marks:     {:.3f}\n'.format(convergenced[:, 9].mean()))
+        print('Average Generator Pg Sum: {:.3f}'.format(convergenced[:, 0].mean()))
+        print('Average Loads Pg Sum    : {:.3f}'.format(convergenced[:, 4].mean()))
+        print('Average Pg Rage: {:.3f}'.format(convergenced[:, 0].mean() / convergenced[:, 4].mean()))
+
+        if self.mark:
+            print('Average Mark Generator Pg Sum: {:.3f}'.format(convergenced[:, 2].mean()))
+            print('Average Mark Loads Pg Sum    : {:.3f}'.format(convergenced[:, 6].mean()))
+            print('Average Mark Pg Rage: {:.3f}\n'.format(convergenced[:, 2].mean() / convergenced[:, 6].mean()))
+
+        print('Average Generator Qg Sum: {:.3f}'.format(convergenced[:, 1].mean()))
+        print('Average Loads Qg Sum    : {:.3f}'.format(convergenced[:, 5].mean()))
+        print('Average Qg Rage: {:.3f}'.format(convergenced[:, 1].mean() / convergenced[:, 5].mean()))
+        if self.mark:
+            print('Average Mark Generator Qg Sum: {:.3f}'.format(convergenced[:, 3].mean()))
+            print('Average Mark Loads Qg Sum    : {:.3f}'.format(convergenced[:, 7].mean()))
+            print('Average Mark Qg Rage: {:.3f}'.format(convergenced[:, 3].mean() / convergenced[:, 7].mean()))
+
+        print('\n----------DisConvergenced Samples----------')
+        if self.mark:
+            print('Average of generator marks: {:.3f}'.format(disconvergenced[:, 8].mean()))
+            print('Average of Loads marks:     {:.3f}\n'.format(disconvergenced[:, 9].mean()))
+        print('Average Generator Pg Sum: {:.3f}'.format(disconvergenced[:, 0].mean()))
+        print('Average Loads Pg Sum    : {:.3f}'.format(disconvergenced[:, 4].mean()))
+        print('Average Pg Rage: {:.3f}'.format(disconvergenced[:, 0].mean() / disconvergenced[:, 4].mean()))
+
+        if self.mark:
+            print('Average Mark Generator Pg Sum: {:.3f}'.format(disconvergenced[:, 2].mean()))
+            print('Average Mark Loads Pg Sum    : {:.3f}'.format(disconvergenced[:, 6].mean()))
+            print('Average Mark Pg Rage: {:.3f}\n'.format(disconvergenced[:, 2].mean() / disconvergenced[:, 6].mean()))
+
+        print('Average Generator Qg Sum: {:.3f}'.format(disconvergenced[:, 1].mean()))
+        print('Average Loads Qg Sum    : {:.3f}'.format(disconvergenced[:, 5].mean()))
+        print('Average Qg Rage: {:.3f}'.format(disconvergenced[:, 1].mean() / disconvergenced[:, 5].mean()))
+
+        if self.mark:
+            print('Average Mark Generator Qg Sum: {:.3f}'.format(disconvergenced[:, 3].mean()))
+            print('Average Mark Loads Qg Sum    : {:.3f}'.format(disconvergenced[:, 7].mean()))
+            print('Average Mark Qg Rage: {:.3f}'.format(disconvergenced[:, 3].mean() / disconvergenced[:, 7].mean()))
+
+        if plot:
+            convergenced_num = convergenced.shape[0]
+            convergenced_x = [i for i in range(convergenced_num)]
+            # plt.plot(convergenced_x, convergenced[:, 0], color='green', label='GeneratorPgSum')
+            # plt.plot(convergenced_x, convergenced[:, 4], color='red', label='LoadsPgSum')
+            # plt.legend()
+            # plt.show()
+
+            # plt.plot(convergenced_x, convergenced[:, 2], color='green', label='MarkGeneratorPgSum')
+            # plt.plot(convergenced_x, convergenced[:, 6], color='red', label='MarkLoadsPgSum')
+            # plt.legend()
+            # plt.show()
+
+            # plt.plot(convergenced_x, convergenced[:, 1], color='green', label='GeneratorQgSum')
+            # plt.plot(convergenced_x, convergenced[:, 5], color='red', label='LoadsQgSum')
+            # plt.legend()
+            # plt.show()
+
+            # plt.plot(convergenced_x, convergenced[:, 3], color='green', label='MarkGeneratorQgSum')
+            # plt.plot(convergenced_x, convergenced[:, 7], color='red', label='MarkLoadsQgSum')
+            # plt.legend()
+            # plt.show()
+
+            # Disconvergenced
+            disconvergenced_num = disconvergenced.shape[0]
+            disconvergenced_x = [i for i in range(disconvergenced_num)]
+            # plt.plot(disconvergenced_x, disconvergenced[:, 0], color='green', label='GeneratorPgSum')
+            # plt.plot(disconvergenced_x, disconvergenced[:, 4], color='red', label='LoadsPgSum')
+            # plt.legend()
+            # plt.show()
+
+            # plt.plot(disconvergenced_x, disconvergenced[:, 2], color='green', label='MarkGeneratorPgSum')
+            # plt.plot(disconvergenced_x, disconvergenced[:, 6], color='red', label='MarkLoadsPgSum')
+            # plt.legend()
+            # plt.show()
+
+            # plt.plot(disconvergenced_x, disconvergenced[:, 1], color='green', label='GeneratorQgSum')
+            # plt.plot(disconvergenced_x, disconvergenced[:, 5], color='red', label='LoadsQgSum')
+            # plt.legend()
+            # plt.show()
+
+            # plt.plot(disconvergenced_x, disconvergenced[:, 3], color='green', label='MarkGeneratorQgSum')
+            # plt.plot(disconvergenced_x, disconvergenced[:, 7], color='red', label='MarkLoadsQgSum')
+            # plt.legend()
+            # plt.show()
+
+            # Marks
+            # plt.plot(disconvergenced_x, disconvergenced[:, 8], color='green', label='DisGeneratorMark')
+            # plt.plot(disconvergenced_x, disconvergenced[:, 9], color='red', label='DisLoadsMark')
+            # plt.legend()
+            # plt.show()
+            # plt.plot(convergenced_x, convergenced[:, 8], color='green', label='GeneratorMark')
+            # plt.plot(convergenced_x, convergenced[:, 9], color='red', label='LoadsMark')
+            # plt.legend()
+            # plt.show()
 
 
 class dataLoader_36Nodes(powerDatasetLoader):
@@ -75,6 +243,11 @@ class dataLoader_36Nodes(powerDatasetLoader):
         self.generators_num = 9
         self.ac_num = 134
         self.shape = (86, 2)
+        self.mark = False
+        self.key_dict = {
+            'pg': 0,
+            'qg': 0
+        }
  
     def one_data(self, data_idx):
         path = self.dataList['path'][data_idx]
@@ -108,6 +281,13 @@ class dataLoader_2000Nodes(powerDatasetLoader):
         self.loads_num = 816
         self.generators_num = 531
         self.shape = (816 + 531, 4)
+        self.mark = True
+        self.key_dict = {
+            'mark': 0,
+            'pg': 1,
+            'qg': 2,
+            'vbase': 3
+        }
     
     def one_data(self, data_idx):
         result = np.zeros(self.shape, dtype=np.float32)
@@ -135,158 +315,6 @@ class dataLoader_2000Nodes(powerDatasetLoader):
             else:
                 print('{} diffierent'.format(i))
     
-    def set_pg_qg(self, path):
-        with open(path, 'rb') as fp:
-            dataset = pkl.load(fp)
-            all_data = dataset['data']
-            label = dataset['label']
-        all_data = all_data.swapaxes(1, 2)
-        convergenced_num = sum(label)
-        disconvergenced_num = len(label) - convergenced_num
-
-        # GeneratorPgSum
-        # GeneratorQgSum
-        # GeneratorPgMarkSum
-        # GeneratorQgMarkSum
-        # LoadsPgSum
-        # LoadsQgSum
-        # LoadsPgMarkSum
-        # LoadsQgMarkSum
-        # GeneratorMarkSum
-        # LoadsMarkSum
-        convergenced = np.zeros((convergenced_num, 10))
-        disconvergenced = np.zeros((disconvergenced_num, 10))
-        convergenced_cnt = disconvergenced_cnt = 0
-        for i in range(label.shape[0]):
-            data = all_data[i]
-            if label[i] == 1:
-                convergenced[convergenced_cnt][0] = data[1, self.loads_num:].sum()
-                convergenced[convergenced_cnt][1] = data[2, self.loads_num:].sum()
-                convergenced[convergenced_cnt][2] = sum(data[1, self.loads_num:] * data[0, self.loads_num:])
-                convergenced[convergenced_cnt][3] = sum(data[2, self.loads_num:] * data[0, self.loads_num:])
-
-                convergenced[convergenced_cnt][4] = sum(data[1, :self.loads_num])
-                convergenced[convergenced_cnt][5] = sum(data[2, :self.loads_num])
-                convergenced[convergenced_cnt][6] = sum(data[1, :self.loads_num] * data[0, :self.loads_num])
-                convergenced[convergenced_cnt][7] = sum(data[2, :self.loads_num] * data[0, :self.loads_num])
-
-                convergenced[convergenced_cnt][8] = sum(data[0, self.loads_num:])
-                convergenced[convergenced_cnt][9] = sum(data[0, :self.loads_num])
-                convergenced_cnt += 1
-            else:
-                disconvergenced[disconvergenced_cnt][0] = sum(data[1, self.loads_num:])
-                disconvergenced[disconvergenced_cnt][1] = sum(data[2, self.loads_num:])
-                disconvergenced[disconvergenced_cnt][2] = sum(data[1, self.loads_num:] * data[0, self.loads_num:])
-                disconvergenced[disconvergenced_cnt][3] = sum(data[2, self.loads_num:] * data[0, self.loads_num:])
-
-                disconvergenced[disconvergenced_cnt][4] = sum(data[1, :self.loads_num])
-                disconvergenced[disconvergenced_cnt][5] = sum(data[2, :self.loads_num])
-                disconvergenced[disconvergenced_cnt][6] = sum(data[1, :self.loads_num] * data[0, :self.loads_num])
-                disconvergenced[disconvergenced_cnt][7] = sum(data[2, :self.loads_num] * data[0, :self.loads_num])
-
-                disconvergenced[disconvergenced_cnt][8] = sum(data[0, self.loads_num:])
-                disconvergenced[disconvergenced_cnt][9] = sum(data[0, :self.loads_num])
-                disconvergenced_cnt += 1
-        
-        np.save(self.path + 'convergenced_features.npy', convergenced)
-        np.save(self.path + 'disconvergenced_features.npy', disconvergenced)
-    
-    def plot_pg_qg(self):
-        convergenced = np.load(self.path + 'convergenced_features.npy')
-        disconvergenced = np.load(self.path + 'disconvergenced_features.npy')
-
-        print('----------Convergenced Samples----------')
-        print('Average of generator marks: {:.3f}'.format(convergenced[:, 8].mean()))
-        print('Average of Loads marks:     {:.3f}\n'.format(convergenced[:, 9].mean()))
-        print('Average Generator Pg Sum: {:.3f}'.format(convergenced[:, 0].mean()))
-        print('Average Loads Pg Sum    : {:.3f}'.format(convergenced[:, 4].mean()))
-        print('Average Pg Rage: {:.3f}'.format(convergenced[:, 0].mean() / convergenced[:, 4].mean()))
-
-        print('Average Mark Generator Pg Sum: {:.3f}'.format(convergenced[:, 2].mean()))
-        print('Average Mark Loads Pg Sum    : {:.3f}'.format(convergenced[:, 6].mean()))
-        print('Average Mark Pg Rage: {:.3f}\n'.format(convergenced[:, 2].mean() / convergenced[:, 6].mean()))
-
-        print('Average Generator Qg Sum: {:.3f}'.format(convergenced[:, 1].mean()))
-        print('Average Loads Qg Sum    : {:.3f}'.format(convergenced[:, 5].mean()))
-        print('Average Qg Rage: {:.3f}'.format(convergenced[:, 1].mean() / convergenced[:, 5].mean()))
-
-        print('Average Mark Generator Qg Sum: {:.3f}'.format(convergenced[:, 3].mean()))
-        print('Average Mark Loads Qg Sum    : {:.3f}'.format(convergenced[:, 7].mean()))
-        print('Average Mark Qg Rage: {:.3f}'.format(convergenced[:, 3].mean() / convergenced[:, 7].mean()))
-
-        print('\n----------DisConvergenced Samples----------')
-        print('Average of generator marks: {:.3f}'.format(disconvergenced[:, 8].mean()))
-        print('Average of Loads marks:     {:.3f}\n'.format(disconvergenced[:, 9].mean()))
-        print('Average Generator Pg Sum: {:.3f}'.format(disconvergenced[:, 0].mean()))
-        print('Average Loads Pg Sum    : {:.3f}'.format(disconvergenced[:, 4].mean()))
-        print('Average Pg Rage: {:.3f}'.format(disconvergenced[:, 0].mean() / disconvergenced[:, 4].mean()))
-
-        print('Average Mark Generator Pg Sum: {:.3f}'.format(disconvergenced[:, 2].mean()))
-        print('Average Mark Loads Pg Sum    : {:.3f}'.format(disconvergenced[:, 6].mean()))
-        print('Average Mark Pg Rage: {:.3f}\n'.format(disconvergenced[:, 2].mean() / disconvergenced[:, 6].mean()))
-
-        print('Average Generator Qg Sum: {:.3f}'.format(disconvergenced[:, 1].mean()))
-        print('Average Loads Qg Sum    : {:.3f}'.format(disconvergenced[:, 5].mean()))
-        print('Average Qg Rage: {:.3f}'.format(disconvergenced[:, 1].mean() / disconvergenced[:, 5].mean()))
-
-        print('Average Mark Generator Qg Sum: {:.3f}'.format(disconvergenced[:, 3].mean()))
-        print('Average Mark Loads Qg Sum    : {:.3f}'.format(disconvergenced[:, 7].mean()))
-        print('Average Mark Qg Rage: {:.3f}'.format(disconvergenced[:, 3].mean() / disconvergenced[:, 7].mean()))
-
-        convergenced_num = convergenced.shape[0]
-        convergenced_x = [i for i in range(convergenced_num)]
-        # plt.plot(convergenced_x, convergenced[:, 0], color='green', label='GeneratorPgSum')
-        # plt.plot(convergenced_x, convergenced[:, 4], color='red', label='LoadsPgSum')
-        # plt.legend()
-        # plt.show()
-
-        # plt.plot(convergenced_x, convergenced[:, 2], color='green', label='MarkGeneratorPgSum')
-        # plt.plot(convergenced_x, convergenced[:, 6], color='red', label='MarkLoadsPgSum')
-        # plt.legend()
-        # plt.show()
-
-        # plt.plot(convergenced_x, convergenced[:, 1], color='green', label='GeneratorQgSum')
-        # plt.plot(convergenced_x, convergenced[:, 5], color='red', label='LoadsQgSum')
-        # plt.legend()
-        # plt.show()
-
-        # plt.plot(convergenced_x, convergenced[:, 3], color='green', label='MarkGeneratorQgSum')
-        # plt.plot(convergenced_x, convergenced[:, 7], color='red', label='MarkLoadsQgSum')
-        # plt.legend()
-        # plt.show()
-
-        # Disconvergenced
-        disconvergenced_num = disconvergenced.shape[0]
-        disconvergenced_x = [i for i in range(disconvergenced_num)]
-        # plt.plot(disconvergenced_x, disconvergenced[:, 0], color='green', label='GeneratorPgSum')
-        # plt.plot(disconvergenced_x, disconvergenced[:, 4], color='red', label='LoadsPgSum')
-        # plt.legend()
-        # plt.show()
-
-        # plt.plot(disconvergenced_x, disconvergenced[:, 2], color='green', label='MarkGeneratorPgSum')
-        # plt.plot(disconvergenced_x, disconvergenced[:, 6], color='red', label='MarkLoadsPgSum')
-        # plt.legend()
-        # plt.show()
-
-        # plt.plot(disconvergenced_x, disconvergenced[:, 1], color='green', label='GeneratorQgSum')
-        # plt.plot(disconvergenced_x, disconvergenced[:, 5], color='red', label='LoadsQgSum')
-        # plt.legend()
-        # plt.show()
-
-        # plt.plot(disconvergenced_x, disconvergenced[:, 3], color='green', label='MarkGeneratorQgSum')
-        # plt.plot(disconvergenced_x, disconvergenced[:, 7], color='red', label='MarkLoadsQgSum')
-        # plt.legend()
-        # plt.show()
-
-        # Marks
-        # plt.plot(disconvergenced_x, disconvergenced[:, 8], color='green', label='DisGeneratorMark')
-        # plt.plot(disconvergenced_x, disconvergenced[:, 9], color='red', label='DisLoadsMark')
-        # plt.legend()
-        # plt.show()
-        # plt.plot(convergenced_x, convergenced[:, 8], color='green', label='GeneratorMark')
-        # plt.plot(convergenced_x, convergenced[:, 9], color='red', label='LoadsMark')
-        # plt.legend()
-        # plt.show()
 
     def get_ac_data(self, data_idx):
         result = np.zeros(2970)
@@ -303,4 +331,6 @@ data = dataLoader_36Nodes('env/data/36nodes_new/')
 # data.set_pg_qg('env/data/dongbei_LF-2000/train.pkl')
 # data.plot_pg_qg()
 
-data.set_dataset()
+# data.set_dataset()
+data.set_pg_qg('env/data/36nodes_new/train.pkl')
+data.plot_pg_qg()

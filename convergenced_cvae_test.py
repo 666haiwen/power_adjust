@@ -15,7 +15,7 @@ from env.TrendData import TrendData
 os.environ['CUDA_VISIBLE_DEVICES'] = '0'
 IDX = 1
 DATA_PATH = ['env/data/36nodes_new/1/11', 'env/data/dongbei_LF-2000/dataset/1/11/']
-PATH = ['model/case39_cvae', 'model/case2K_cvae_128.pth']
+PATH = ['model/case39_cvae_32.pth', 'model/case2K_cvae_128.pth']
 CONTENT = [['g', 'ac'], ['g']]
 def get_args():
     parser = argparse.ArgumentParser(description='VAE MINST Example')
@@ -68,10 +68,11 @@ def _test_iteration(model, trendData, data, labels, path):
         trendData.reset(path[idx], restate=False)
         if labels[idx] == 0:
             # continue
-            new_data = reverse_recon_batch[idx].cpu().numpy()
+            # new_data = reverse_recon_batch[idx].cpu().numpy()
+            new_data = data[idx].cpu().numpy()
             for alpha_Pg in [0.9, 1.0, 0.95]:
                 for alpha_Qg in [0.9, 1.0, 0.95]:
-                    result = trendData.test(new_data, content=CONTENT[IDX], 
+                    result = trendData.test(new_data, content=CONTENT[IDX], dataset=IDX,
                                             balance=True, alpha_Pg=alpha_Pg, alpha_Qg=alpha_Qg)
                     if result == True:
                         break
@@ -88,9 +89,9 @@ def _test_iteration(model, trendData, data, labels, path):
 
 def main():
     if IDX == 0:
-        model = VAE(134 + 19 * 2, args.latent_size, True, 2)
+        model = VAE(args.latent_size, input_channel=2, condition=True, num_labels=2)
     elif IDX == 1:
-        model = ConvVAE(args.latent_size, condition=True, num_labels=2)
+        model = ConvVAE(args.latent_size, input_channel=4, condition=True, num_labels=2)
     if args.cuda:
         model = model.cuda()
     args.path = os.path.join(os.getcwd(), args.path)
@@ -117,9 +118,6 @@ if __name__ == "__main__":
         train_loader = get_case39_dataloader(batch_size=args.batch_size)
         test_loader = get_case39_dataloader(batch_size=args.batch_size, test=True)
 
-    # generators_num = 9
-    # loads_num = 10
-
-    loads_num = 816
-    generators_num = 531
+    loads_num = [10, 816][IDX]
+    generators_num = [9, 531][IDX]
     main()

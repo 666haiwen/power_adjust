@@ -39,7 +39,7 @@ def get_args():
                         help='path to model saving')
     parser.add_argument('--load-checkpoint', type=bool, default=True,
                         help='load history model or not (default = True)')
-    parser.add_argument('--lr', type=int, default=1e-4,
+    parser.add_argument('--lr', type=float, default=1e-4,
                         help='learning rate of training (default = 1e-4)')
     parser.add_argument('--log-interval', type=int, default=50,
                         help='how many batches to wait before logging training status')
@@ -50,7 +50,7 @@ def get_args():
     parser.add_argument('--conditional',  type=bool, default=True)
     parser.add_argument('--beta', type=float, default=1.0, help='weight of loads mse')
     args = parser.parse_args()
-    args.path = args.path + '_beta{:.1f}_{}.pth'.format(args.beta, args.latent_size)
+    args.path = args.path + '_{}.pth'.format(args.latent_size)
     args.cuda = args.cuda and torch.cuda.is_available()
     return args
 
@@ -64,11 +64,7 @@ def adjust_learning_rate(lr, optimizer):
 
 def loss_function(recon_x, x, mu, logvar):
     # BCE = F.binary_cross_entropy(recon_x, x, reduction='sum')
-    if IDX == 1:
-        BCE = F.mse_loss(recon_x, x, reduction='sum')
-    else:
-        BCE = F.mse_loss(recon_x[:, loads_num * 2:], x[:, loads_num * 2:], reduction='sum') + \
-            args.beta * F.mse_loss(recon_x[:, :loads_num * 2], x[:, :loads_num * 2], reduction='sum')
+    BCE = F.mse_loss(recon_x, x, reduction='sum')
     # KL_Distance : 0.5 * sum(1 + log(sigma^2) - mu^2 - sigma^2)
     KLD = 0.5 * torch.sum(1 + logvar - mu ** 2 - logvar.exp())
     return BCE - KLD
