@@ -166,26 +166,30 @@ class TrendData(object):
         # return sum(data[:, 0]), sum(data[:, 1])
 
 
-    def test(self, data, content=['g'], dataset=0, balance=True, alpha_Pg=1.0, alpha_Qg=1.0):
+    def test(self, data, content=['g'], dataset='case36', balance=True, alpha_Pg=1.0, alpha_Qg=1.0):
         """
             Test the result by vae.
             @params:
                 data: numpy data to set generators/loads/acs
                 content: reload content, type: list
+                dataset: 'case36'/'DongBei_Case'
                 balance: balance Pg/Qg between generators and loads, default: True
                 alpha: the coefficient of balance, default:1.2
         """
+        if dataset != 'case36' and dataset != 'DongBei_Case':
+            raise ValueError("params of env test function must belong to \
+                ['case36', 'DongBei_Case'], but input {} instead.".format(dataset))
         if 'ac' in content:
             ac_begin = self.g_len + self.l_len
             for i in range(self.ac_len):
                 self.ACs[i]['mark'] = int(data[i % 2][ac_begin + int(i / 2)] + 0.5)
-        
+
         if 'g' in content:
-            if dataset == 0:
+            if dataset == 'case36':
                 for i in range(self.g_len):
                     self.generators[i]['Pg'] = data[0][i + self.l_len]
                     self.generators[i]['Qg'] = data[1][i + self.l_len]
-            else:
+            elif dataset == 'DongBei_Case':
                 for i in range(self.g_len):
                     self.generators[i]['mark'] = int(data[0][i + self.l_len] + 0.5)
                     self.generators[i]['Pg'] = data[1][i + self.l_len]
@@ -210,7 +214,7 @@ class TrendData(object):
 
         if 'l' in content:
             for i in range(self.l_len):
-                if dataset == 0:
+                if dataset == 'case36':
                     self.loads[i]['Pg'] = data[0][i]
                     self.loads[i]['Qg'] = data[1][i]
                 else:

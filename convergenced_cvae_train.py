@@ -15,13 +15,13 @@ from torch.nn import functional as F
 from torchvision.utils import save_image
 from common.dataloaders import get_case39_dataloader
 from common.dataloaders import get_case2k_dataloader
-from model import VAE, ConvVAE
+from common.model import VAE, ConvVAE
 from env.TrendData import TrendData
 
 
 os.environ['CUDA_VISIBLE_DEVICES'] = '0'
 IDX = 0
-DATA_PATH = ['env/data/36nodes_new/1/11', 'env/data/dongbei_LF-2000/dataset/1/11/']
+DATA_PATH = ['env/data/case36/1/11', 'env/data/dongbei_LF-2000/dataset/1/11/']
 PATH = ['model/case39_cvae', 'model/case2K_cvae']
 def get_args():
     parser = argparse.ArgumentParser(description='VAE MINST Example')

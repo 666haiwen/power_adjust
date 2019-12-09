@@ -24,7 +24,7 @@ def select_action(state, eps_threshold, n_actions, device, policy_net):
         return torch.tensor([[random.randrange(n_actions)]], device=device, dtype=torch.long), True
 
 def Actor(idx, policy_net, device):
-  env = Env(rand=CFG.RANDOM_INIT, dataset='36nodes_new', thread=idx)
+  env = Env(rand=CFG.RANDOM_INIT, dataset='case36', thread=idx)
   random.seed(idx + CFG.SEED)
   n_actions = env.action_space
   eps_threshold = CFG.EPS_BEGIN ** (1 + idx * CFG.EPS_ALPHA / CFG.NUM_PROCESS)
@@ -54,7 +54,7 @@ def Learn(policy_net, target_net, epoch_end):
 
 
 if __name__ == '__main__':  
-  env = Env(rand=CFG.RANDOM_INIT, dataset='36nodes_new')
+  env = Env(rand=CFG.RANDOM_INIT, dataset='case36')
   n_actions = env.action_space
   state_dim = env.state_dim
 

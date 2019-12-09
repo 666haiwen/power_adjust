@@ -6,12 +6,12 @@ from torch.utils.data import Dataset, DataLoader
 
 def get_case39_dataloader(batch_size=512,
                             test=False,
-                            path_to_data='env/data/36nodes_new/train.pkl',
+                            path_to_data='env/data/case36/train.pkl',
                             gan=False,
                             num_workers=1):
     """DSprites dataloader."""
     if test:
-        path_to_data = 'env/data/36nodes_new/test.pkl'
+        path_to_data = 'env/data/case36/test.pkl'
     case39_data = Case39Dataset(path_to_data, test=test, gan=gan)
     case39_loader = DataLoader(case39_data, batch_size=batch_size,
                                  shuffle=False, num_workers=num_workers)
@@ -136,3 +136,4 @@ class Case2KDataset(Dataset):
         else:
             path = self.path[idx]
             return sample, label, path
+

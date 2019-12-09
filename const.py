@@ -31,7 +31,7 @@ CFG.LOAD_MODEL = False
 CFG.MEMORY_READ = False
 CFG.TARGET_UPDATE = 30
 CFG.SAVE_EPOCHS = 500
-CFG.MODEL_PATH = 'model/36nodes_new_state_voltage.pth'
+CFG.MODEL_PATH = 'model/case36_state_voltage.pth'
 # CFG.MODEL_PATH = 'model/39nodes_convergenced_with_convergenced.pth'
 
 """ ##############

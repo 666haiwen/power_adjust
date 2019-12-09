@@ -5,7 +5,7 @@ import numpy as np
 from env.power_env import Env
 from common.replayMemory import PrioritizedReplayBuffer, Transition
 from const import CFG
-from model import DQN, Dueling_DQN
+from common.model import DQN, Dueling_DQN
 
 import torch
 import torch.optim as optim
@@ -146,7 +146,7 @@ def train(steps_done):
 
 
 # env init
-env = Env(rand=CFG.RANDOM_INIT, dataset='36nodes_new', target='state-voltage')
+env = Env(rand=CFG.RANDOM_INIT, dataset='case36', target='state-voltage')
 n_actions = env.action_space
 state_dim = env.state_dim
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -166,7 +166,7 @@ target_net.eval()
 # optimizer = optim.RMSprop(policy_net.parameters(), lr=CFG.LR)
 optimizer = optim.Adam(policy_net.parameters(), lr=CFG.LR)
 # data memory
-memory = PrioritizedReplayBuffer(1000000, CFG.MEMORY + '36nodes_new_state_voltage_PrioritizedRB.pkl')
+memory = PrioritizedReplayBuffer(1000000, CFG.MEMORY + 'case36_state_voltage_PrioritizedRB.pkl')
 if CFG.MEMORY_READ:
     memory.read()
 

@@ -11,11 +11,11 @@ class Env(object):
         Env of power calculation.
         Return the State, Reward by action of agent.
     """
-    def __init__(self, dataset='36nodes', runPath='env/run/', target='state-section', 
+    def __init__(self, dataset='case36', runPath='env/run/', target='state-section', 
                 classifer_model=None, rand=False, thread=None):
         """
             @params:
-            36nodes: the path to the template folder, load initialize settings.
+            dataset: the path to the any case belong to dataset folder, load initialize settings.
             runPath: the path to the WMLFRTMsg.exe folder
             rand: initialize random or not, default: False
             target: the target of task, 'state-section' means section trend state adjust, 

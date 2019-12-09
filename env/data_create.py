@@ -1,3 +1,5 @@
+# data_create.py is used to create dataset contain convergenced data and disconvergenced data based on IEEE-CASE.
+# The way to create dataset is based on 电科院, detail in: https://www.yuque.com/yas4z2/zr4l99/yubgqy
 from pypower.api import case39, ppoption
 from custom_runpf import runpf
 import numpy as np

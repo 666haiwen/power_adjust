@@ -7,6 +7,13 @@
 - tensorboardX = 1.7
 
 
+
+### 数据说明
+
+ 目前潮流相关的数据集包含：旧的36节点数据集，新的一批36节点数据集，东北电网数据集，数据集位于**'env\\data\\'**文件夹中
+
+
+
 ### 文件说明
 
 - env\ 存放着和电科院WMLFRTMsg.exe交互的环境
@@ -14,16 +21,32 @@
 - 需要将群文件data.rar解压放到env目录下，其解压后的目录应为：
 
 ```
+\common
+	dataloaders.py (生成模型的dataloaders)
+	model.py (存放vae、DQN相关模型)
+	noisy.py
+	replayMemory.py
+	segement_tree.py(都是与强化学习相关的辅助文件)
+	convergenced_Test.py(潮流收敛测试文件)
+	utils.py(产生生成模型的数据抽象)
+\cyclegan（cyclegan 相关文件)
 \env
 	\data
 	\run
 	\template
 	__init__.py
 	const.py
-	env.py
-	test.py
-	TrendData.py
-	utils.py
+	power_env.py(电科院的强化学习交互环境)
+	pypower_env.py(基于pypower的强化学习交互环境)
+	TrendData.py(基于电科院仿真程序的一系列文件读取、修改操作)
+
+adjustment_train.py(强化学习训练程序，直接运行即可)
+apex.py(apex分布式强化学习，尚未完成)
+const.py(强化学习相关的const)
+
+convergenced_cvae_train.py(收敛问题用vae训练的代码)
+convergenced_cycle_gan.py(收敛问题用gan训练的代码)
+convergenced_test.py（测试收敛问题，暂时只能用cvae模型，但很好扩展)
 ```
 
 
@@ -42,6 +65,10 @@
 
 ---
 
+
+
+### 1.强化学习问题
+
 潮流问题主要跟这么几个元件相关：
 
 发电机、负荷、电容电抗器；
@@ -56,7 +83,7 @@
 
 其中、负荷参数、电容电抗器的相关参数是不能修改的，其中电容电抗器的参数在一个电网中往往都是不变的，只有挂载与否不同，因此，暂定在潮流问题中的state和action如下设置
 
-#### 1.潮流收敛调整和潮流状态电压调整
+#### 1.1潮流收敛调整和潮流状态电压调整
 
 这两个的state和action是一样的，reward收敛的给出了，电压调整的再说，可以自己设定
 
@@ -95,7 +122,7 @@ $R=[1,-0.01]$ 代表收敛和没有收敛
 
 
 
-#### 2.潮流状态调整——断面
+#### 1.2.潮流状态调整——断面
 
 断面简单来看，就是一个电网的拓扑结果，通过一个断面(一组线的集合)，将拓扑图可以分成两个连通子图.
 
@@ -144,7 +171,25 @@ reward = proximity(y) - proximity(x)
 
 
 
-#### ENV使用说明
+---
 
-见test.py
+### 2.潮流收敛问题
+
+在一个潮流收敛无解的负荷水平下，经过怎样的调整使得当前负荷水平下的潮流收敛(有解)
+
+调整手段包括：发电机的切机、有功无功、电压；电容电抗的切机等
+
+现有工作：用生成模型直接将不收敛样例转变为收敛样例
+
+
+
+#### 数据抽象
+
+详见common\\utils.py
+
+
+
+### 3.其他
+
+**‘env\\潮流程序’**包含了新的潮流仿真程序，32位，区别在于：现在可以读取一个样例，在内存中修改数据，再计算潮流；而原来的潮流程序只能写到文件里才能用.(尚未使用)
 

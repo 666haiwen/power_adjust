@@ -3,7 +3,7 @@ import json
 import numpy as np
 import pickle as pkl
 import random
-
+import torch
 import matplotlib.pyplot as plt
 
 class powerDatasetLoader(object):
@@ -232,7 +232,7 @@ class powerDatasetLoader(object):
 
 
 class dataLoader_36Nodes(powerDatasetLoader):
-    def __init__(self, path='env/data/36nodes_new/'):
+    def __init__(self, path='env/data/case36/'):
         """
         loads: (10, 2) Pg, Qg
         generators: (9, 2) Pg, Qg
@@ -324,13 +324,3 @@ class dataLoader_2000Nodes(powerDatasetLoader):
                 data = line.split(',')[:-1]
                 result[i] = int(data[0])
         return result
-
-
-data = dataLoader_36Nodes('env/data/36nodes_new/')
-# data = dataLoader_2000Nodes()
-# data.set_pg_qg('env/data/dongbei_LF-2000/train.pkl')
-# data.plot_pg_qg()
-
-# data.set_dataset()
-data.set_pg_qg('env/data/36nodes_new/train.pkl')
-data.plot_pg_qg()
