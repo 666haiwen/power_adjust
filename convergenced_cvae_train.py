@@ -13,7 +13,7 @@ import torch
 from torch import nn, optim
 from torch.nn import functional as F
 from torchvision.utils import save_image
-from common.dataloaders import get_case39_dataloader
+from common.dataloaders import get_case36_dataloader
 from common.dataloaders import get_case2k_dataloader
 from common.model import VAE, ConvVAE
 from env.TrendData import TrendData
@@ -22,7 +22,7 @@ from env.TrendData import TrendData
 os.environ['CUDA_VISIBLE_DEVICES'] = '0'
 IDX = 0
 DATA_PATH = ['env/data/case36/1/11', 'env/data/dongbei_LF-2000/dataset/1/11/']
-PATH = ['model/case39_cvae', 'model/case2K_cvae']
+PATH = ['model/case36_cvae', 'model/case2K_cvae']
 def get_args():
     parser = argparse.ArgumentParser(description='VAE MINST Example')
     parser.add_argument('--batch-size', type=int, default=512, metavar='N',
@@ -148,8 +148,8 @@ if __name__ == "__main__":
         train_loader = get_case2k_dataloader(batch_size=args.batch_size)
         test_loader = get_case2k_dataloader(batch_size=args.batch_size, test=True)
     elif IDX == 0:
-        train_loader = get_case39_dataloader(batch_size=args.batch_size)
-        test_loader = get_case39_dataloader(batch_size=args.batch_size, test=True)
+        train_loader = get_case36_dataloader(batch_size=args.batch_size)
+        test_loader = get_case36_dataloader(batch_size=args.batch_size, test=True)
 
     loads_num = [10, 816][IDX]
     generators_num = [9, 531][IDX]

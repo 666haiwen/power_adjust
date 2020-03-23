@@ -38,22 +38,29 @@ class TrendData(object):
         # read data
         self.buses, self.bus_name = self.__load_buses() if buses == None else buses
         self.generators, self.g_index = self.__load_generators() if generators == None else generators
-        self.loads, self.l_index = self.__load_loads() if loads == None else loads
-        self.ACs = self.__load_AC_lines()
+        self.loads, self.l_index, self.loads_mark_num = self.__load_loads() if loads == None else loads
+        self.ACs, self.CRs = self.__load_AC_lines()
         self.ACs_output = self.__load_AC_output_lines()
         
         # set params
-        self.ac_len = len(self.ACs) if target != 'state-section' else 26 # 26 just for 36nodes (index > 26) are all Shunt capacitor
+        self.ac_len = len(self.ACs)
+        self.cr_len = len(self.CRs)
         self.g_len = len(self.generators)
         self.l_len = len(self.loads)
-        self.nodesNum = self.g_len + self.l_len + self.ac_len
+        self.ac_out_len = len(self.ACs_output)
+
+        if 'state' in target:
+            self.ac_out_len = SECTION_TASK['ac_out_len']
+            self.nodesNum = self.g_len + self.l_len + self.ac_out_len
+        else:
+            self.nodesNum = self.g_len + self.l_len + self.cr_len
         self.state_dim = (FEATURENS_NUM, self.nodesNum)
         # initialize the state
         self.state = np.zeros((1, FEATURENS_NUM, self.nodesNum), dtype=np.float32)
         self.Pg = 0
 
     
-    def reset(self, path, restate=True):
+    def reset(self, path, restate=True, cr_set=False):
         """
             reset the env.
         """
@@ -61,17 +68,25 @@ class TrendData(object):
         self.copy_files()
 
         self.generators, self.g_index = self.__load_generators()
-        self.loads, self.l_index = self.__load_loads()
-        self.ACs = self.__load_AC_lines()
+        self.loads, self.l_index, self.loads_mark_num = self.__load_loads()
+        self.ACs, self.CRs = self.__load_AC_lines()
+
+        self.ac_len = len(self.ACs)
+        self.cr_len = len(self.CRs)
+        self.g_len = len(self.generators)
+        self.l_len = len(self.loads)
+
         if restate:
             self.get_state()
         if self.target == 'state-section':
             self.run()
             self.ACs_output = self.__load_AC_output_lines()
-            self.pre_value = self.__calculate_state_section_reward()
+            self.pre_value = self.calculate_state_section_reward()
             self.Pg = sum(self.state[0,0,:self.g_len])
         if self.target == 'state-voltage':
             self.pre_value = [0]
+        if cr_set:
+            self.__set_crs_by_loads()
 
 
     def copy_files(self):
@@ -92,8 +107,8 @@ class TrendData(object):
         """
         self.path = path
         self.generators, self.g_index = self.__load_generators()
-        self.loads, self.l_index = self.__load_loads()
-        self.ACs = self.__load_AC_lines()
+        self.loads, self.l_index, self.loads_mark_num = self.__load_loads()
+        self.ACs, self.CRs = self.__load_AC_lines()
         return self.get_state()
     
     def get_state(self):
@@ -112,13 +127,18 @@ class TrendData(object):
             self.state[0][0][i + self.g_len] = self.__get_loads(i)['Pg']
             self.state[0][1][i + self.g_len] = self.__get_loads(i)['Qg']
         
-        # set marks of ac_lines
-        for i in range(self.ac_len):
-            index = i + self.g_len + self.l_len
-            self.state[0][0][index] = self.ACs_output[i]['Pg'] if self.target == 'state-section'\
-                else self.ACs[i]['mark']
-            self.state[0][1][index] = self.ACs_output[i]['Qg'] if self.target == 'state-section'\
-                else self.ACs[i]['mark']
+        if self.target == 'state-section':
+            # set Pg Qg of ac lines
+            for i in range(self.ac_out_len):
+                index = i + self.g_len + self.l_len
+                self.state[0][0][index] = self.ACs_output[i]['Pg']
+                self.state[0][1][index] = self.ACs_output[i]['Qg']
+        elif self.target == 'state-voltage':
+            # set marks of Shunt Capacitor Reactor
+            for i in range(self.CRs):
+                index = i + self.g_len + self.l_len
+                self.state[0][0][index] = self.CRs[i]['mark']
+                self.state[0][1][index] = self.CRs[i]['mark']
 
         return self.state
 
@@ -137,7 +157,7 @@ class TrendData(object):
         # set marks of ac_lines
         if self.target != 'state-section':
             for i in range(self.ac_len):
-                self.ACs[i]['mark'] = state[0][0][i + self.g_len + self.l_len]
+                self.CRs[i]['mark'] = state[0][0][i + self.g_len + self.l_len]
 
     def run(self):
         """
@@ -179,10 +199,10 @@ class TrendData(object):
         if dataset != 'case36' and dataset != 'DongBei_Case':
             raise ValueError("params of env test function must belong to \
                 ['case36', 'DongBei_Case'], but input {} instead.".format(dataset))
-        if 'ac' in content:
-            ac_begin = self.g_len + self.l_len
-            for i in range(self.ac_len):
-                self.ACs[i]['mark'] = int(data[i % 2][ac_begin + int(i / 2)] + 0.5)
+        if 'cr' in content:
+            cr_begin = self.g_len + self.l_len
+            for i in range(self.cr_len):
+                self.CRs[i]['mark'] = int(data[i % 2][cr_begin + int(i / 2)] + 0.5)
 
         if 'g' in content:
             if dataset == 'case36':
@@ -222,7 +242,7 @@ class TrendData(object):
                     self.loads[i]['Pg'] = data[1][i]
                     self.loads[i]['Qg'] = data[2][i]
                     self.loads[i]['V0'] = data[3][i]
-        self.__output(content=content)
+        self.__output(content=content + ['cr'])
         return self.run()
         
 
@@ -274,16 +294,16 @@ class TrendData(object):
             data[0][i * 2] = self.state[0][0][i]
             data[0][i * 2 + 1] = self.state[0][1][i]
         
-        ac_begin = (self.g_len + self.l_len) * 2
-        for i in range(self.ac_len):
-            data[0][ac_begin + i] = self.ACs[i]['mark']
+        cr_begin = (self.g_len + self.l_len) * 2
+        for i in range(self.cr_len):
+            data[0][cr_begin + i] = self.CRs[i]['mark']
         
         data = torch.from_numpy(data).float()
         output = classifer_model(data)[0][1]
         return - abs(1 - output)
 
 
-    def __calculate_state_section_reward(self):
+    def calculate_state_section_reward(self):
         value = 0
         for index in self.target_line:
             value += self.ACs_output[index]['Pg']
@@ -300,7 +320,7 @@ class TrendData(object):
         """
         # section reward
         self.ACs_output = self.__load_AC_output_lines()
-        value = self.__calculate_state_section_reward()
+        value = self.calculate_state_section_reward()
         self.pre_value = value
         section_reward = proximity_section(value)
 
@@ -350,11 +370,11 @@ class TrendData(object):
             @param:
             action: the action from agent. Apply the action into files in the disk. type: dict
         """
-        if action['node'] == 'AC':
-            self.ACs[action['index']]['mark'] = 1 - self.ACs[action['index']]['mark']
-            ac_index = action['index'] + self.g_len + self.l_len
-            self.state[0][0][ac_index] = 1 - self.state[0][0][ac_index]
-            self.state[0][1][ac_index] = 1 - self.state[0][1][ac_index]
+        if action['node'] == 'CR':
+            self.CRs[action['index']]['mark'] = 1 - self.CRs[action['index']]['mark']
+            cr_index = action['index'] + self.g_len + self.l_len
+            self.state[0][0][cr_index] = 1 - self.state[0][0][cr_index]
+            self.state[0][1][cr_index] = 1 - self.state[0][1][cr_index]
 
         elif action['node'] == 'generator':
             index = self.g_index[action['index']]
@@ -457,18 +477,33 @@ class TrendData(object):
             load ac_lines(LF.L2) data into memory.
         """
         ACs = []
+        Crs = []
         with open(os.path.join(self.path, 'LF.L2'), 'r', encoding='gbk') as fp:
             for line in fp:
                 data = line.split(',')[:-1]
                 R = float(data[4])
                 X = float(data[5])
-                ACs.append({
-                    'mark': int(data[0]),
-                    'R': R,
-                    'X': X,
-                    'data': data.copy()
-                })
-        return ACs
+                I = int(data[1])
+                J = int(data[2])
+                if I == J:
+                    Crs.append({
+                        'mark': int(data[0]),
+                        'I': I,
+                        'J': J,
+                        'R': R,
+                        'X': X,
+                        'data': data.copy()
+                    })
+                else:
+                    ACs.append({
+                        'mark': int(data[0]),
+                        'I': I,
+                        'J': J,
+                        'R': R,
+                        'X': X,
+                        'data': data.copy()
+                    })
+        return ACs, Crs
     
     def __load_AC_output_lines(self):
         """
@@ -493,6 +528,7 @@ class TrendData(object):
         """
         loads = []
         index = []
+        mark = 0
         with open(os.path.join(self.path,'LF.L6'), 'r', encoding='gbk') as fp:
             for i, line in enumerate(fp):
                 data = line.split(',')[:-1]
@@ -507,6 +543,7 @@ class TrendData(object):
                 QMax = float(data[8])
                 loads.append({
                     'mark': int(data[0]),
+                    'busName': int(data[1]),
                     'Type': int(data[3]),
                     'Pg': P,
                     'Qg': Q,
@@ -517,9 +554,10 @@ class TrendData(object):
                     'PMin': PMin,
                     'data': data.copy()
                 })
-        return loads, index
+                mark += loads[-1]['mark']
+        return loads, index, mark
     
-    def __output(self, content=['g', 'ac']):
+    def __output(self, content=['g']):
         """
             write the adjust input data to the dst dirs
         """
@@ -528,9 +566,11 @@ class TrendData(object):
                 fp.write(s + ',')
             fp.write('\n')
         
-        if 'ac' in content:
+        if 'cr' in content:
             with open(os.path.join(self.runPath, 'LF.L2'), 'w+', encoding='utf-8') as fp:
                 for v in self.ACs:
+                    fpWrite(fp, v['data'])
+                for v in self.CRs:
                     data = v['data']
                     data[0] = '{}'.format(v['mark'])
                     fpWrite(fp, data)
@@ -545,6 +585,7 @@ class TrendData(object):
                         data[4] = '{:.3f}'.format(v['Qg'])
                         data[5] = '{:.3f}'.format(v['V0'])
                         fpWrite(fp, data)
+
         if 'vae' in self.target and 'l' in content:
             with open(os.path.join(self.runPath, 'LF.L6'), 'w+', encoding='utf-8') as fp:
                 for v in self.loads:
@@ -554,3 +595,34 @@ class TrendData(object):
                     data[5] = '{:.3f}'.format(v['Qg'])
                     data[6] = '{:.3f}'.format(v['V0'])
                     fpWrite(fp, data)
+    
+    def __set_crs_by_loads(self, rate=0.20):
+        """
+            set shunt Capacitor Reactors near heavy loads.
+            set Capacitor to 1 (whose X < 0)
+            set Reactors to 0 (whose X > 0)
+            @paramters:
+            rate: float, top rate of heavy loads. The shunt capcitor reactors near them should be reset.
+        """
+        sorted_loads = sorted(self.loads, key=lambda load: load['Pg'], reverse=True)
+        high_loads_list = []
+        cnt = 0
+        limits = int(self.loads_mark_num * rate)
+        for load in sorted_loads:
+            if load['mark'] == 1 and cnt < limits:
+                cnt += 1
+                high_loads_list.append(load['busName'])
+        
+        for i, cr in enumerate(self.CRs):
+            if cr['X'] >= 99999:
+                continue
+            if cr['I'] in high_loads_list:
+                print('!!!!')
+                if cr['X'] < 0:
+                    if self.CRs[i]['mark'] == 0:
+                        print('Open capacitance {}!'.format(cr['I']))
+                        self.CRs[i]['mark'] = 1
+                else:
+                    if self.CRs[i]['mark'] == 1:
+                        print('Close Reactance {}!'.format(cr['I']))
+                        self.CRs[i]['mark'] = 0

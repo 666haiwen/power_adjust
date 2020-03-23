@@ -14,7 +14,7 @@ from tensorboardX import SummaryWriter
 from env.TrendData import TrendData
 from cyclegan.models import Generator, Discriminator
 from cyclegan.utils import ReplayBuffer, LambdaLR, weights_init_normal
-from common.dataloaders import get_case39_dataloader
+from common.dataloaders import get_case36_dataloader
 
 
 os.environ['CUDA_VISIBLE_DEVICES'] = '0'
@@ -221,9 +221,9 @@ if __name__ == "__main__":
     fake_B_buffer = ReplayBuffer()
 
     # Dataset loader
-    train_loader = get_case39_dataloader(batch_size=args.batch_size, transform=False, 
+    train_loader = get_case36_dataloader(batch_size=args.batch_size, transform=False, 
         gan=True, num_workers=args.n_cpu)
-    test_loader = get_case39_dataloader(transform=False, batch_size=args.batch_size, 
+    test_loader = get_case36_dataloader(transform=False, batch_size=args.batch_size, 
         test=True, num_workers=args.n_cpu)
     
     # Train

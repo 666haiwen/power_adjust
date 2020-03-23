@@ -5,7 +5,7 @@ import numpy as np
 from env.power_env import Env
 from common.replayMemory import PrioritizedReplayBuffer, Transition
 from const import CFG
-from common.model import DQN, Dueling_DQN
+from common.model import Dueling_DQN
 
 import torch
 import torch.optim as optim
@@ -69,9 +69,11 @@ def train(steps_done):
     decay = CFG.EPS_DECAY
     success_rate = [False for i in range(env.capacity)]
     iter_num = 0
+    value_list = [0 for i in range(20)]
     for epoch in range(epoch_end + 1, CFG.EPOCHS):
         success_epoch = [False for i in range(env.capacity)]
         for index in range(env.capacity):
+            print('[{}]/[{}]'.format(index, env.capacity))
             tmp_index = env.reset()
             iter_num += 1
             print("epoch[{}]  index: [{}]".format(epoch, tmp_index))
@@ -137,6 +139,8 @@ def train(steps_done):
                 }, CFG.MODEL_PATH)
                 memory.save()
 
+
+    print(value_list)
     writer.add_scalars('Epoch', {
         'success': sum(success_rate) / env.capacity,
         'history_success': sum(success_epoch) / env.capacity,
@@ -146,7 +150,7 @@ def train(steps_done):
 
 
 # env init
-env = Env(rand=CFG.RANDOM_INIT, dataset='case36', target='state-voltage')
+env = Env(rand=CFG.RANDOM_INIT, dataset='case118', target='state-section')
 n_actions = env.action_space
 state_dim = env.state_dim
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -166,7 +170,7 @@ target_net.eval()
 # optimizer = optim.RMSprop(policy_net.parameters(), lr=CFG.LR)
 optimizer = optim.Adam(policy_net.parameters(), lr=CFG.LR)
 # data memory
-memory = PrioritizedReplayBuffer(1000000, CFG.MEMORY + 'case36_state_voltage_PrioritizedRB.pkl')
+memory = PrioritizedReplayBuffer(1000000, CFG.MEMORY + 'case118_state_adjust_PrioritizedRB.pkl')
 if CFG.MEMORY_READ:
     memory.read()
 

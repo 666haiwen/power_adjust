@@ -1,17 +1,19 @@
 import os
 import argparse
 import time
-import numpy as np
 import torch
-from common.dataloaders import get_case39_dataloader
-from common.dataloaders import get_case2k_dataloader
+import numpy as np
+import pickle as pkl
+
+from common.dataloaders import get_case36_dataloader, get_case2k_dataloader
+from common.dataset_create import dataLoader_36Nodes, dataLoader_2000Nodes
 from common.model import VAE, ConvVAE
 from common.convergenced_Test import Convergenced
 from env.TrendData import TrendData
 
 
 os.environ['CUDA_VISIBLE_DEVICES'] = '0'
-PATH = ['model/case39_cvae_32.pth', 'model/case2K_cvae_128.pth']
+PATH = ['model/case36_cvae_32.pth', 'model/case2K_cvae_128.pth']
 RECON_PATH = ['env/data/case36/recon.pkl', 'env/data/dongbei_LF-2000/recon.pkl']
 CONTENT = [['g', 'ac'], ['g']]
 
@@ -38,14 +40,16 @@ if __name__ == '__main__':
     dataset = ''
     if args.dataset == 1:
         dataset = 'DongBei_Case'
+        data_loader = dataLoader_2000Nodes()
         model = ConvVAE(args.latent_size, input_channel=4, condition=True, num_labels=2)
         train_loader = get_case2k_dataloader(batch_size=args.batch_size)
         test_loader = get_case2k_dataloader(batch_size=args.batch_size, test=True)
     elif args.dataset == 0:
         dataset = 'case36'
+        data_loader = dataLoader_36Nodes()
         model = VAE(args.latent_size, input_channel=2, condition=True, num_labels=2)
-        train_loader = get_case39_dataloader(batch_size=args.batch_size)
-        test_loader = get_case39_dataloader(batch_size=args.batch_size, test=True)
+        train_loader = get_case36_dataloader(batch_size=args.batch_size)
+        test_loader = get_case36_dataloader(batch_size=args.batch_size, test=True)
     if args.cuda:
         model = model.cuda()
 
@@ -55,5 +59,11 @@ if __name__ == '__main__':
     else:
         print('Doesn\'t find checkpoint in ' + args.path)
 
-    convergenced_test = Convergenced(model, args.cuda, dataset)
-    convergenced_test.reverse_recon_dataset(test_loader)
+    convergenced_test = Convergenced(model, args.cuda, dataset, data_loader)
+    convergenced_test.test(test_loader)
+    # convergenced_test.reverse_recon_dataset(test_loader)
+    # convergenced_test.distance_test()
+
+    # with open('env/data/case36/test_latent_dataset.pkl', 'rb') as fp:
+    #     dataset = pkl.load(fp)
+    # print(111)

@@ -145,3 +145,7 @@ class Env(object):
                 'index': action,
                 'node': 'AC'
             }
+
+    
+    def get_section_power(self):
+        return self.trendData.calculate_state_section_reward()

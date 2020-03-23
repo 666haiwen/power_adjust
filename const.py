@@ -21,7 +21,7 @@ CFG.TAU = 0.001
 """ ################
     LOG
 """
-CFG.LOG = 'log/36nodes_state_voltage/'
+CFG.LOG = 'log/case118_state_adjust/'
 CFG.REWARD_LOG = 100
 
 """ ##############
@@ -31,7 +31,7 @@ CFG.LOAD_MODEL = False
 CFG.MEMORY_READ = False
 CFG.TARGET_UPDATE = 30
 CFG.SAVE_EPOCHS = 500
-CFG.MODEL_PATH = 'model/case36_state_voltage.pth'
+CFG.MODEL_PATH = 'model/case118_state_adjust.pth'
 # CFG.MODEL_PATH = 'model/39nodes_convergenced_with_convergenced.pth'
 
 """ ##############

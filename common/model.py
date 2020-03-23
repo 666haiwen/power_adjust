@@ -16,7 +16,9 @@ class Dueling_DQN(nn.Module):
             nn.LeakyReLU(negative_slope=0.05),
             nn.Linear(512, 1024),
             nn.LeakyReLU(negative_slope=0.05),
-            nn.Linear(1024, 1024),
+            nn.Linear(1024, 2048),
+            nn.LeakyReLU(negative_slope=0.05),
+            nn.Linear(2048, 1024),
             nn.LeakyReLU(negative_slope=0.05),
             nn.Linear(1024, 512),
             nn.LeakyReLU(negative_slope=0.05),
@@ -26,6 +28,10 @@ class Dueling_DQN(nn.Module):
         self.state_fc = nn.Linear(256, 1)
         self.advantage_fc = nn.Sequential(
             nn.Linear(256, 512),
+            nn.LeakyReLU(negative_slope=0.05),
+            nn.Linear(512, 1024),
+            nn.LeakyReLU(negative_slope=0.05),
+            nn.Linear(1024, 512),
             nn.LeakyReLU(negative_slope=0.05),
             nn.Linear(512, 256),
             nn.LeakyReLU(negative_slope=0.05),

@@ -4,7 +4,7 @@ import torch
 from torch.utils.data import Dataset, DataLoader
 
 
-def get_case39_dataloader(batch_size=512,
+def get_case36_dataloader(batch_size=512,
                             test=False,
                             path_to_data='env/data/case36/train.pkl',
                             gan=False,
@@ -12,14 +12,14 @@ def get_case39_dataloader(batch_size=512,
     """DSprites dataloader."""
     if test:
         path_to_data = 'env/data/case36/test.pkl'
-    case39_data = Case39Dataset(path_to_data, test=test, gan=gan)
-    case39_loader = DataLoader(case39_data, batch_size=batch_size,
+    case36_data = Case36Dataset(path_to_data, test=test, gan=gan)
+    case36_loader = DataLoader(case36_data, batch_size=batch_size,
                                  shuffle=False, num_workers=num_workers)
-    return case39_loader
+    return case36_loader
 
 
-class Case39Dataset(Dataset):
-    """Case39 dataset.
+class Case36Dataset(Dataset):
+    """Case36 dataset.
         Data shape (numbers, 2):
             (pg, qg) of loads
             (pg, qg) of generators
@@ -97,7 +97,7 @@ def get_case2k_dataloader(batch_size=512,
 
 
 class Case2KDataset(Dataset):
-    """Case39 dataset.
+    """DongBei case dataset.
         Data shape (numbers, 4):
             (mark, pg, qg, vBase) of loads
             (mark, pg, qg, vBase) of generators
