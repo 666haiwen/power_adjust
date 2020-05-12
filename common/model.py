@@ -241,52 +241,52 @@ class VAE(nn.Module):
 class ConvVAE(VAE):
     def __init__(self, latent_size, input_channel=4, condition=False, num_labels=2):
         """
-        Shape: 816 + 531 = (1347, 4) + num_labels ==> 1349, 4 + one zeros ==> 1350, 4
+        Shape: 816 + 531 + 220 = (1567, 4) + num_labels ==> 1569, 4 + one zeros ==> 1350, 4
         """
         super(ConvVAE, self).__init__(latent_size, input_channel=input_channel, 
             condition=condition, num_labels=num_labels)
         
-        self.input_dim = 1347
+        self.input_dim = 1567
         self.hidden_dim = 2048
-        self.reside_size = 21
+        self.reside_size = 24
         self.reside_channel = 512
         # Define encoder
         self.features = nn.Sequential(
-            # 672
+            # 784
             nn.Conv1d(input_channel + num_labels, 32, 3, padding=1),
             nn.LeakyReLU(inplace=True),
             nn.BatchNorm1d(32),
-            nn.AdaptiveAvgPool1d(672),
+            nn.AdaptiveAvgPool1d(784),
 
-            # 336
+            # 392
             nn.Conv1d(32, 64, 3, padding=1),
             nn.LeakyReLU(inplace=True),
             nn.BatchNorm1d(64),
             nn.MaxPool1d(2),
 
-            # 168
+            # 196
             nn.Conv1d(64, 128, 3, padding=1),
             nn.LeakyReLU(inplace=True),
             nn.BatchNorm1d(128),
             nn.MaxPool1d(2),
 
-            # 84
+            # 98
             nn.Conv1d(128, 256, 3, padding=1),
             nn.LeakyReLU(inplace=True),
             nn.BatchNorm1d(256),
             nn.MaxPool1d(2),
 
-            # 42
+            # 49
             nn.Conv1d(256, 512, 3, padding=1),
             nn.LeakyReLU(inplace=True),
             nn.BatchNorm1d(512),
             nn.MaxPool1d(2),
 
-            # 21
+            # 24
             nn.Conv1d(512, 512, 3, padding=1),
             nn.LeakyReLU(inplace=True),
             nn.BatchNorm1d(512),
-            nn.MaxPool1d(2),
+            nn.AdaptiveAvgPool1d(24),
         )
         self.features_to_hidden = nn.Sequential(
             nn.Linear(self.reside_channel * self.reside_size, self.hidden_dim),
