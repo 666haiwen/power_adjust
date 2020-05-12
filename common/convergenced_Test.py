@@ -40,6 +40,9 @@ class Convergenced(object):
         elif dataset == 'DongBei_Case':
             self.trend_data_path = 'env/data/dongbei_LF-2000/dataset/1/11/'
             self.dataset_path = 'env/data/dongbei_LF-2000/'
+        elif dataset == 'case2000':
+            self.trend_data_path = 'env/data/case2000/dataset/1/11/'
+            self.dataset_path = 'env/data/case2000/'
         else:
             raise ValueError("params of env test function must belong to \
                 ['case36', 'DongBei_Case'], but input {} instead.".format(dataset))

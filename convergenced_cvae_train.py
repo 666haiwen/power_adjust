@@ -20,22 +20,19 @@ from env.TrendData import TrendData
 
 
 os.environ['CUDA_VISIBLE_DEVICES'] = '0'
-IDX = 0
-DATA_PATH = ['env/data/case36/1/11', 'env/data/dongbei_LF-2000/dataset/1/11/']
-PATH = ['model/case36_cvae', 'model/case2K_cvae']
+IDX = 2
+PATH = ['model/case36_cvae', 'model/case2K_cvae', 'model/new_case2K_cave']
 def get_args():
     parser = argparse.ArgumentParser(description='VAE MINST Example')
     parser.add_argument('--batch-size', type=int, default=512, metavar='N',
                         help='input batch size of trainning (default = 128)')
-    parser.add_argument('--epochs', type=int, default=1500,
-                        help='number of epochs to train (default = 1500)')
+    parser.add_argument('--epochs', type=int, default=2000,
+                        help='number of epochs to train (default = 2000)')
     parser.add_argument('--cuda', type=bool, default=True,
                         help='enables CUDA traning or not (default = True)')
     parser.add_argument('--num-workers', type=int, default=2,
                         help='num of workers while training and testing (default = 2)')
     parser.add_argument('--path', type=str, default=PATH[IDX],
-                        help='path to model saving')
-    parser.add_argument('--data-path', type=str, default=DATA_PATH[IDX],
                         help='path to model saving')
     parser.add_argument('--load-checkpoint', type=bool, default=True,
                         help='load history model or not (default = True)')
@@ -117,7 +114,7 @@ def train(model, optimizer, train_loader, epoch_begin, lr):
 def main():
     if IDX == 0:
         model = VAE(args.latent_size, input_channel=2, condition=args.conditional, num_labels=2)
-    elif IDX == 1:
+    elif IDX == 1 or IDX == 2:
         model = ConvVAE(args.latent_size, input_channel=4, condition=args.conditional, num_labels=2)
     if args.cuda:
         model = model.cuda()
@@ -144,13 +141,13 @@ if __name__ == "__main__":
     kwargs = {'num_workers': 1, 'pin_memory': True} if args.cuda \
     else {'num_workers': args.num_workers}
 
-    if IDX == 1:
+    if IDX == 1 or IDX == 2:
         train_loader = get_case2k_dataloader(batch_size=args.batch_size)
         test_loader = get_case2k_dataloader(batch_size=args.batch_size, test=True)
     elif IDX == 0:
         train_loader = get_case36_dataloader(batch_size=args.batch_size)
         test_loader = get_case36_dataloader(batch_size=args.batch_size, test=True)
 
-    loads_num = [10, 816][IDX]
-    generators_num = [9, 531][IDX]
+    loads_num = [10, 816, 816][IDX]
+    generators_num = [9, 531, 531][IDX]
     main()

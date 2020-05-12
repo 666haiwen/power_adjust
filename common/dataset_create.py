@@ -37,6 +37,8 @@ class powerDatasetLoader(object):
         self.mark = False
         self.loads_num = 0
         self.generators_num = 0
+        self.tandem_num = 0
+        self.parallel_num = 0
         self.key_dict = {}
 
         with open(path + 'convergence.json', 'w') as fp:
@@ -273,13 +275,15 @@ class powerDatasetLoader(object):
             # plt.legend()
             # plt.show()
 
+    def capacitive_reactor_test(self):
+        pass
 
 class dataLoader_36Nodes(powerDatasetLoader):
     def __init__(self, path='env/data/case36/'):
         """
         loads: (10, 2) Pg, Qg
         generators: (9, 2) Pg, Qg
-        Ac: (134,) => (67, 0) Mark Mark
+        Ac: (134,) => (67, 2) Mark Mark
         """
         super(dataLoader_36Nodes, self).__init__(path)
         self.loads_num = 10
@@ -354,22 +358,24 @@ class dataLoader_118Nodes(powerDatasetLoader):
         }
 
 class dataLoader_2000Nodes(powerDatasetLoader):
-    def __init__(self, path='env/data/dongbei_LF-2000/'):
+    def __init__(self, path='env/data/case2000/'):
         """
-        loads: (816, 4) Marks, Pg, Qg, Vbase
-        generators: (531, 4) Marks, Pg, Qg, Vbase
-        acs: (2970, 1) Marks
+        loads: (816, 4) Marks, Pg, Qg, Type
+        generators: (531, 4) Marks, Pg, Qg, Type
+        parallel_acs: (877, 1) ==> (220, 4) Marks
         """
         super(dataLoader_2000Nodes, self).__init__(path)
         self.loads_num = 816
         self.generators_num = 531
-        self.shape = (816 + 531, 4)
+        self.tandem_num = 2093
+        self.parallel_num = 877
+        self.shape = (816 + 531 + 220, 4)
         self.mark = True
         self.key_dict = {
             'mark': 0,
             'pg': 1,
             'qg': 2,
-            'vbase': 3
+            'type': 3
         }
     
     def transfer_data(self, data):
@@ -402,14 +408,21 @@ class dataLoader_2000Nodes(powerDatasetLoader):
         with open(os.path.join(path,'LF.L6'), 'r', encoding='gbk') as fp:
             for i, line in enumerate(fp):
                 data = line.split(',')[:-1]
-                result[i] = np.array([float(data[0]), float(data[4]), float(data[5]), float(data[6])])
+                result[i] = np.array([float(data[0]), float(data[4]), float(data[5]), float(data[3])])
 
         with open(os.path.join(path, 'LF.L5'), 'r', encoding='gbk') as fp:
             for i, line in enumerate(fp):
                 data = line.split(',')[:-1]
                 result[i + self.loads_num] = \
-                    np.array([float(data[0]), float(data[3]), float(data[4]), float(data[5])])
+                    np.array([float(data[0]), float(data[3]), float(data[4]), float(data[2])])
 
+        offset = self.loads_num + self.generators_num
+        with open(os.path.join(path, 'LF.L5'), 'r', encoding='gbk') as fp:
+            for i, line in enumerate(fp):
+                if i < self.tandem_num:
+                    continue
+                index = i - self.tandem_num 
+                result[index + offset, index % self.shape[1]] = float(data[0])
         return result
 
     def test_ac(self):
@@ -424,10 +437,12 @@ class dataLoader_2000Nodes(powerDatasetLoader):
     
 
     def get_ac_data(self, data_idx):
-        result = np.zeros(2970)
+        result = np.zeros(self.tandem_num)
         path = self.dataList['path'][data_idx]
         with open(os.path.join(path,'LF.L2'), 'r', encoding='gbk') as fp:
             for i, line in enumerate(fp):
+                if i >= self.tandem_num:
+                    break
                 data = line.split(',')[:-1]
                 result[i] = int(data[0])
         return result

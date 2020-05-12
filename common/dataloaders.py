@@ -85,11 +85,11 @@ class Case36Dataset(Dataset):
 
 def get_case2k_dataloader(batch_size=512,
                             test=False,
-                            path_to_data='env/data/dongbei_LF-2000/train.pkl',
+                            path_to_data='env/data/case2000/train.pkl',
                             num_workers=1):
     """DSprites dataloader."""
     if test:
-        path_to_data = 'env/data/dongbei_LF-2000/test.pkl'
+        path_to_data = 'env/data/case2000/test.pkl'
     case2k_data = Case2KDataset(path_to_data, test=test)
     case2k_loader = DataLoader(case2k_data, batch_size=batch_size,
                                  shuffle=False, num_workers=num_workers)
@@ -99,8 +99,8 @@ def get_case2k_dataloader(batch_size=512,
 class Case2KDataset(Dataset):
     """DongBei case dataset.
         Data shape (numbers, 4):
-            (mark, pg, qg, vBase) of loads
-            (mark, pg, qg, vBase) of generators
+            (mark, pg, qg, type) of loads
+            (mark, pg, qg, type) of generators
         numbers: 1347
     """
     def __init__(self, path_to_data, test=False):

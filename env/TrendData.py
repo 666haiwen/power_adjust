@@ -196,25 +196,26 @@ class TrendData(object):
                 balance: balance Pg/Qg between generators and loads, default: True
                 alpha: the coefficient of balance, default:1.2
         """
-        if dataset != 'case36' and dataset != 'DongBei_Case':
+        dim = data.shape[1]
+        if dataset != 'case36' and dataset != 'DongBei_Case' and dataset != 'case2000':
             raise ValueError("params of env test function must belong to \
                 ['case36', 'DongBei_Case'], but input {} instead.".format(dataset))
         if 'cr' in content:
             cr_begin = self.g_len + self.l_len
             for i in range(self.cr_len):
-                self.CRs[i]['mark'] = int(data[i % 2][cr_begin + int(i / 2)] + 0.5)
+                self.CRs[i]['mark'] = int(data[i % dim][cr_begin + int(i / dim)] + 0.5)
 
         if 'g' in content:
             if dataset == 'case36':
                 for i in range(self.g_len):
                     self.generators[i]['Pg'] = data[0][i + self.l_len]
                     self.generators[i]['Qg'] = data[1][i + self.l_len]
-            elif dataset == 'DongBei_Case':
+            elif dataset == 'DongBei_Case' or dataset == 'case2000':
                 for i in range(self.g_len):
                     self.generators[i]['mark'] = int(data[0][i + self.l_len] + 0.5)
                     self.generators[i]['Pg'] = data[1][i + self.l_len]
                     self.generators[i]['Qg'] = data[2][i + self.l_len]
-                    self.generators[i]['V0'] = data[3][i + self.l_len]
+                    self.generators[i]['Type'] = int(data[3][i + self.l_len] + 0.5)
 
         if balance:
             loads_pg = sum([x['Pg'] * x['mark'] for x in self.loads])
@@ -241,7 +242,6 @@ class TrendData(object):
                     self.loads[i]['mark'] =  int(data[0][i] + 0.5)
                     self.loads[i]['Pg'] = data[1][i]
                     self.loads[i]['Qg'] = data[2][i]
-                    self.loads[i]['V0'] = data[3][i]
         self.__output(content=content + ['cr'])
         return self.run()
         
@@ -583,7 +583,7 @@ class TrendData(object):
                         data[0] = '{}'.format(v['mark'])
                         data[3] = '{:.3f}'.format(v['Pg'])
                         data[4] = '{:.3f}'.format(v['Qg'])
-                        data[5] = '{:.3f}'.format(v['V0'])
+                        data[2] = '{:.3f}'.format(v['Type'])
                         fpWrite(fp, data)
 
         if 'vae' in self.target and 'l' in content:
@@ -593,7 +593,6 @@ class TrendData(object):
                     data[0] = '{}'.format(v['mark'])
                     data[4] = '{:.3f}'.format(v['Pg'])
                     data[5] = '{:.3f}'.format(v['Qg'])
-                    data[6] = '{:.3f}'.format(v['V0'])
                     fpWrite(fp, data)
     
     def __set_crs_by_loads(self, rate=0.20):
