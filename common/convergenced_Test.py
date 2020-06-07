@@ -22,6 +22,19 @@ DongBei_PARAMS = {
         'content': ['g']
     }
 }
+CASE2000_PARAMS = {
+    'dataset': 'case2000',
+    'vae': True,
+    'convergenced':{
+        'bool': True,
+        'content': ['g', 'l', 'cr']
+    },
+    'disconvergenced': {
+        'bool': True,
+        'rule': False,
+        'content': ['g', 'cr']
+    }
+}
 class Convergenced(object):
     def __init__(self, model, cuda, dataset, data_loader):
         """
@@ -57,6 +70,8 @@ class Convergenced(object):
             test_loader: data loader of test data, type: torch.utils.data.Dataset
             params: params of test setting, type:dict default:DongBei_PARAMS
         """
+        if params == 'case2000':
+            params = CASE2000_PARAMS
         original_success = []
         original_failed = []
         trendData = TrendData(target='jointvae', path=self.trend_data_path)
@@ -86,6 +101,8 @@ class Convergenced(object):
             recon_batch = self.model.decode(mu_batch, labels)
         
             reverse_recon_batch = self.model.decode(mu_batch, reverse_labels)
+            mu_batch, _ = self.model.encode(reverse_recon_batch, labels)
+            reverse_recon_batch_again = self.model.decode(mu_batch, reverse_labels)
         else:
             recon_batch = reverse_recon_batch = data
         shape = recon_batch.shape
@@ -96,22 +113,26 @@ class Convergenced(object):
         normal_params = params['convergenced']
         recon_data_list = []
         for idx in range(shape[0]):
-            trendData.reset(path[idx], restate=False, cr_set=True)
+            trendData.reset(path[idx], restate=False, cr_set=False)
             result = 0
             if labels[idx] == 0 and dis_params['bool'] == True:
                 new_data = reverse_recon_batch[idx].cpu().numpy()
                 recon_data_list.append(new_data.copy())
                 if dis_params['rule'] == True:
-                    for alpha_Pg in [0.9, 1.0, 0.95]:
-                        for alpha_Qg in [0.9]:
-                            result = trendData.test(new_data, content=dis_params['content'], dataset=params['dataset'],
-                                                    balance=True, alpha_Pg=alpha_Pg, alpha_Qg=alpha_Qg)
+                    result = trendData.test(new_data, content=dis_params['content'], dataset=params['dataset'], balance=False)
+                    if result == False:
+                        for alpha_Pg in [0.9, 1.0, 0.95]:
+                            for alpha_Qg in [0.9]:
+                                result = trendData.test(new_data, content=dis_params['content'], dataset=params['dataset'],
+                                                        balance=True, alpha_Pg=alpha_Pg, alpha_Qg=alpha_Qg)
+                                if result == True:
+                                    break
                             if result == True:
                                 break
-                        if result == True:
-                            break
                 else:
                     result = trendData.test(new_data, content=dis_params['content'], dataset=params['dataset'], balance=False)
+                    if result == False:
+                        result = trendData.test(reverse_recon_batch_again[idx].cpu().numpy(), content=dis_params['content'], dataset=params['dataset'], balance=False)
                 original_failed.append(result)
             elif normal_params['bool'] == True:
                 result = trendData.test(recon_batch[idx].cpu().numpy(), dataset=params['dataset'], content=normal_params['content'], balance=False)

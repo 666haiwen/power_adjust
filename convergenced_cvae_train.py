@@ -21,7 +21,7 @@ from env.TrendData import TrendData
 
 os.environ['CUDA_VISIBLE_DEVICES'] = '0'
 IDX = 2
-PATH = ['model/case36_cvae', 'model/case2K_cvae', 'model/new_case2K_cave']
+PATH = ['model/case36_cvae', 'model/case2K_cvae', 'model/new_case2K_cvae']
 def get_args():
     parser = argparse.ArgumentParser(description='VAE MINST Example')
     parser.add_argument('--batch-size', type=int, default=512, metavar='N',

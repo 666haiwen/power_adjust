@@ -190,13 +190,13 @@ class TrendData(object):
         """
             Test the result by vae.
             @params:
-                data: numpy data to set generators/loads/acs
+                data: numpy data to set generators/loads/acs, shape = (dim, num)
                 content: reload content, type: list
                 dataset: 'case36'/'DongBei_Case'
                 balance: balance Pg/Qg between generators and loads, default: True
                 alpha: the coefficient of balance, default:1.2
         """
-        dim = data.shape[1]
+        dim = data.shape[0]
         if dataset != 'case36' and dataset != 'DongBei_Case' and dataset != 'case2000':
             raise ValueError("params of env test function must belong to \
                 ['case36', 'DongBei_Case'], but input {} instead.".format(dataset))
@@ -616,7 +616,6 @@ class TrendData(object):
             if cr['X'] >= 99999:
                 continue
             if cr['I'] in high_loads_list:
-                print('!!!!')
                 if cr['X'] < 0:
                     if self.CRs[i]['mark'] == 0:
                         print('Open capacitance {}!'.format(cr['I']))
